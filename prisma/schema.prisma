@@ -36,6 +36,7 @@ model User {
   contributions Contribution[]
   withdrawals Withdrawal[]
   refreshTokens RefreshToken[]
+  notifications Notification[]
 }
 
 model RefreshToken {
@@ -286,4 +287,35 @@ model Session {
   expiresAt DateTime
   
   createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean  @default(false)
+
+  // Optional link to a related resource
+  circleId  String?
+  link      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, read])
+}
+
+enum NotificationType {
+  CONTRIBUTION_REMINDER
+  PAYOUT_TURN
+  MEMBER_JOINED
+  MEMBER_LEFT
+  PROPOSAL_CREATED
+  PROPOSAL_RESULT
+  CIRCLE_DISSOLVED
+  GENERAL
 }
