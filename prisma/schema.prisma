@@ -87,6 +87,7 @@ model Circle {
 
   @@index([organizerId])
   @@index([status])
+  @@index([organizerId, status])
 }
 
 enum CircleStatus {
@@ -118,6 +119,7 @@ model CircleMember {
   @@index([circleId])
   @@index([userId])
   @@index([status])
+  @@index([userId, status])
 }
 
 enum MemberStatus {
@@ -148,6 +150,7 @@ model Contribution {
   @@index([userId])
   @@index([status])
   @@index([circleId, status])
+  @@index([userId, status])
 }
 
 enum ContributionStatus {
@@ -277,6 +280,7 @@ model Withdrawal {
   @@index([userId])
   @@index([status])
   @@index([circleId, status])
+  @@index([userId, status])
 }
 
 enum WithdrawalStatus {
