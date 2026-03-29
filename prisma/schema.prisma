@@ -385,26 +385,21 @@ enum NotificationType {
 // ==========================================
 
 model AjoGroup {
-  id              String      @id // Matches the Soroban on-chain index/ID
+  id              String   @id @default(uuid())
+  contractAddress String   @unique
   name            String
   description     String?
-  creator_address String      // Maps to User.walletAddress
-  txHash          String?     // Needed for Issue #103 verification
-  status          String      @default("PENDING") // PENDING, CONFIRMED, FAILED
-  created_at      DateTime    @default(now())
-
-  // Relationships
-  creator         User        @relation("GroupCreator", fields: [creator_address], references: [walletAddress])
-  members         AjoMember[]
-
-  @@map("ajo_groups") // Keeps the PostgreSQL table name clean
+  creatorAddress  String
+  status          String   @default("OPEN")
+  maxMembers      Int
+  createdAt       DateTime @default(now())
+  members         UserAjo[]
 }
 
-model AjoMember {
-  id          String   @id @default(cuid())
-  userId      String
-  groupId     String
-  joinedAt    DateTime @default(now())
+model UserAjo {
+  userAddress String
+  ajoId       String
+  ajo         AjoGroup @relation(fields: [ajoId], references: [id], onDelete: Cascade)
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   group       AjoGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
