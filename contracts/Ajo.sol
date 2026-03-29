@@ -1,25 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract Ajo {
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
+contract Ajo is Initializable {
     address public admin;
     uint256 public contributionAmount;
     uint32 public currentCycle;
     uint32 public maxMembers;
+    uint256 public totalPool;
 
-    address[] public members;
-
-    /// @notice The maximum number of members allowed in the pool
-    uint256 public maxMembers;
-
-    /// @notice List of all members in the Ajo pool
     address[] public members;
 
     /// @notice Mapping from member address to their current balance in the pool
     mapping(address => uint256) public balances;
-
-    /// @notice The total amount currently held in the pool
-    uint256 public totalPool;
 
     /// @notice Event emitted when a deposit is made
     event Deposited(address indexed member, uint256 amount);
@@ -39,20 +33,22 @@ contract Ajo {
     error InvalidContribution();
     error AjoIsFull();
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @dev Initializes the Ajo pool with core parameters
-     * @param _contributionAmount The amount required for each contribution
-     * @param _cycleDuration The length of time for one cycle
+     * @param _amount The amount required for each contribution
      * @param _maxMembers The maximum capacity of the pool
+     * @param _admin The administrator of the pool
      */
-    constructor(
-        uint256 _contributionAmount,
-        uint256 _cycleDuration,
-        uint256 _maxMembers
-    ) {
-        contributionAmount = _contributionAmount;
-        cycleDuration = _cycleDuration;
+    function initialize(uint256 _amount, uint32 _maxMembers, address _admin) public initializer {
+        admin = _admin;
+        contributionAmount = _amount;
         maxMembers = _maxMembers;
+        currentCycle = 1;
     }
 
     /**
@@ -72,11 +68,6 @@ contract Ajo {
         totalPool += msg.value;
 
         emit Deposited(msg.sender, msg.value);
-    constructor(uint256 _amount, uint32 _maxMembers) {
-        admin = msg.sender;
-        contributionAmount = _amount;
-        maxMembers = _maxMembers;
-        currentCycle = 1;
     }
 
     /// @notice Get all member addresses
