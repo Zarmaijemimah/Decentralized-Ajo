@@ -11,15 +11,16 @@
     "start": "next start",
     "start:server": "node server/dist/index.js",
     "lint": "eslint .",
-    "test": "npm run test:contracts && npm run test:unit",
+    "test": "npm run test:contracts",
     "test:unit": "jest --runInBand",
     "test:api": "jest --runInBand --selectProjects api",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "test": "npm run test:contracts",
     "test:contracts": "cd contracts/ajo-circle && cargo test --lib",
-    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia"
+    "deploy:sepolia": "hardhat run contracts/ethereum/scripts/deploy.js --network sepolia",
+    "verify:sepolia": "hardhat run scripts/verify.ts --network sepolia",
+    "deploy:verify:sepolia": "npm run deploy:sepolia && npm run verify:sepolia"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -69,6 +70,7 @@
     "cors": "^2.8.5",
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.6.0",
+    "ethers": "^5.7.2",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
@@ -91,6 +93,7 @@
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.0",
     "resend": "^4.8.0",
+    "siwe": "^2.2.0",
     "sonner": "^1.7.1",
     "swr": "^2.2.5",
     "tailwind-merge": "^3.3.1",
@@ -98,8 +101,6 @@
     "vaul": "^1.1.2",
     "viem": "^2.47.6",
     "wagmi": "^3.6.0",
-    "siwe": "^2.2.0",
-    "ethers": "^5.7.2",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -120,6 +121,8 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "concurrently": "^9.1.2",
+    "dotenv": "^17.3.1",
+    "hardhat": "^3.2.0",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
@@ -128,13 +131,10 @@
     "tailwindcss": "^4.2.0",
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
-    "hardhat": "^3.2.0",
-    "postcss": "^8.5",
-    "prisma": "^5.10.0",
-    "tailwindcss": "^4.2.0",
     "tsx": "^4.19.2",
     "tw-animate-css": "1.3.3",
     "typescript": "5.7.3"
   },
-  "packageManager": "pnpm@10.30.2+sha512.36cdc707e7b7940a988c9c1ecf88d084f8514b5c3f085f53a2e244c2921d3b2545bc20dd4ebe1fc245feec463bb298aecea7a63ed1f7680b877dc6379d8d0cb4"
+  "packageManager": "pnpm@10.30.2+sha512.36cdc707e7b7940a988c9c1ecf88d084f8514b5c3f085f53a2e244c2921d3b2545bc20dd4ebe1fc245feec463bb298aecea7a63ed1f7680b877dc6379d8d0cb4",
+  "type": "module"
 }

@@ -8,7 +8,7 @@
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
     "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
     "deploy:mainnet": "hardhat run scripts/deploy.js --network mainnet",
-    "verify:sepolia": "hardhat verify --network sepolia",
+    "verify:sepolia": "echo 'Run: npm run verify:sepolia from the repo root (uses scripts/verify.ts)' && exit 1",
     "node": "hardhat node"
   },
   "devDependencies": {

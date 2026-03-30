@@ -1,8 +1,6 @@
+/// <reference types="node" />
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import "@nomicfoundation/hardhat-verify";
-import "hardhat-gas-reporter";
-import "solidity-coverage";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -16,6 +14,12 @@ dotenv.config();
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "";
 const SEPOLIA_PRIVATE_KEY = process.env.SEPOLIA_PRIVATE_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
+
+if (!ETHERSCAN_API_KEY && process.env.NODE_ENV !== "test") {
+  console.warn(
+    "⚠️  ETHERSCAN_API_KEY is not set — contract verification will fail on Sepolia."
+  );
+}
 
 if (!SEPOLIA_RPC_URL && process.env.NODE_ENV === "production") {
   console.warn("⚠️  SEPOLIA_RPC_URL is not set in .env");
@@ -58,11 +62,22 @@ const config: HardhatUserConfig = {
     },
   },
 
-  // Etherscan verification
+  // ─── Block-explorer verification ─────────────────────────────────────────
+  // @nomicfoundation/hardhat-verify resolves apiKey by network name.
+  // Add entries here when targeting additional chains (e.g. mainnet, polygon).
   etherscan: {
     apiKey: {
-      sepolia: ETHERSCAN_API_KEY || "",
+      sepolia: ETHERSCAN_API_KEY,
+      mainnet: ETHERSCAN_API_KEY,
     },
+    // Extend with custom chains that are not natively supported by hardhat-verify
+    customChains: [],
+  },
+
+  // Sourcify: decentralised, IPFS-backed verification (no API key required).
+  // Falls back to this if Etherscan verification is unavailable.
+  sourcify: {
+    enabled: true,
   },
 
   // Gas reporter
