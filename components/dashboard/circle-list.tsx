@@ -17,6 +17,9 @@ interface Circle {
 interface CircleListProps {
   circles: Circle[];
   loading: boolean;
+  searchQuery?: string;
+  statusFilter?: string;
+  onClearFilters?: () => void;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -29,6 +32,10 @@ export function CircleList({ circles, loading }: CircleListProps) {
   if (loading) {
     return <CircleListSkeleton />;
   }
+
+  const hasActiveFilters =
+    (searchQuery?.trim().length ?? 0) > 0 ||
+    (statusFilter !== '' && statusFilter !== 'ALL');
 
   if (circles.length === 0) {
     return (
