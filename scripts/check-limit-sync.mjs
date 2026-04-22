@@ -19,9 +19,17 @@ const rustSrc = readFileSync(
   "utf8"
 );
 
-/** Extract `pub const NAME: type = value;` entries into a plain object. */
+/** Extract `pub const NAME: type = value;` entries into a plain object.
+ *  Handles:
+ *  - Explicit type annotations:  pub const FOO: u32 = 1;
+ *  - Numeric separators:         pub const FOO: i128 = 10_000_000;
+ *  - Trailing inline comments:   pub const FOO: i128 = 10_000_000; // note
+ */
 function parseRustConsts(src) {
-  const re = /pub const (\w+):\s*\w+\s*=\s*([\d_]+);/g;
+  // Match up to (and including) the semicolon, then ignore anything after it on the same line.
+  // Value group captures digits and underscores only; the semicolon (and any comment) is
+  // consumed by \s*;  outside the capture group.
+  const re = /pub\s+const\s+([A-Z_][A-Z0-9_]*):\s*\w+\s*=\s*([\d_]+)\s*;/g;
   const consts = {};
   for (const [, name, raw] of src.matchAll(re)) {
     consts[name] = BigInt(raw.replace(/_/g, ""));
@@ -37,12 +45,14 @@ const tsSrc = readFileSync(
   "utf8"
 );
 
-/** Extract `export const NAME = value;` entries into a plain object. */
+/** Extract `export const NAME = value;` entries into a plain object.
+ *  Handles numeric separators (10_000_000) and optional trailing comments.
+ */
 function parseTsConsts(src) {
-  const re = /export const (\w+)\s*=\s*([\d_,]+);/g;
+  const re = /export\s+const\s+([A-Z_][A-Z0-9_]*)\s*=\s*([\d_]+)\s*;/g;
   const consts = {};
   for (const [, name, raw] of src.matchAll(re)) {
-    consts[name] = BigInt(raw.replace(/[_,]/g, ""));
+    consts[name] = BigInt(raw.replace(/_/g, ""));
   }
   return consts;
 }
