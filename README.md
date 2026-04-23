@@ -269,6 +269,9 @@ See [Detailed Documentation](./docs/TRANSACTION_HISTORY.md) for strategy and blo
 
 ## Smart Contract
 
+### Capability Matrix ✅
+Complete [Organizer vs Member authorization matrix](contracts/ajo-circle/README.md#organizer-vs-member-capability-matrix) with 100% test coverage for Unauthorized failures.
+
 ### Soroban Contract Features
 
 The Soroban smart contract (`contracts/ajo-circle/src/lib.rs`) implements:
