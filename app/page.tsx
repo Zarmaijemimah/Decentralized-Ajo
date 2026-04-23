@@ -69,7 +69,7 @@ export default function Home() {
   // Update URL when filters change
   const updateURLParams = useCallback(() => {
     const params = new URLSearchParams();
-    if (searchQuery) params.set('search', searchQuery);
+    if (debouncedSearchQuery) params.set('search', debouncedSearchQuery);
     if (statusFilter !== 'ALL') params.set('status', statusFilter);
     if (durationFilter !== 'ALL') params.set('duration', durationFilter);
     if (sortBy !== 'newest') params.set('sortBy', sortBy);
@@ -77,7 +77,7 @@ export default function Home() {
     
     const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
     router.replace(newUrl, { scroll: false });
-  }, [searchQuery, statusFilter, durationFilter, sortBy, currentPage, router]);
+  }, [debouncedSearchQuery, statusFilter, durationFilter, sortBy, currentPage, router]);
 
   useEffect(() => {
     updateURLParams();
@@ -325,7 +325,7 @@ export default function Home() {
           )}
         </div>
 
-        <CircleList circles={circles} loading={loading} />
+        <CircleList circles={circles} loading={loading} onClearFilters={clearAllFilters} />
 
         {totalPages > 1 && (
           <Pagination className="mt-8">
