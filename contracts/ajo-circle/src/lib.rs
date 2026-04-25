@@ -111,7 +111,6 @@ pub struct MemberData {
     pub status: u32,
 }
 
-/// Circle lifecycle status
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CircleStatus {
@@ -125,7 +124,6 @@ pub enum CircleStatus {
     Panicked,
 }
 
-/// Tracks an in-progress dissolution vote
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DissolutionVote {
@@ -133,7 +131,7 @@ pub struct DissolutionVote {
     pub votes_for: u32,
     /// Total number of eligible voting members
     pub total_members: u32,
-    /// Threshold mode: 0 = simple majority (>50%), 1 = supermajority (>66%)
+    /// 0 = simple majority (>50%), 1 = supermajority (>66%)
     pub threshold_mode: u32,
 }
 
@@ -317,11 +315,9 @@ impl AjoCircle {
             return Err(AjoError::NotFound);
         }
 
-        let mut members: Map<Address, MemberData> = env
-            .storage()
-            .instance()
-            .get(&DataKey::Members)
-            .ok_or(AjoError::NotFound)?;
+        let mut members = Self::load_members(&env)?;
+        if members.contains_key(new_member.clone()) { return Err(AjoError::AlreadyExists); }
+        if circle.member_count >= circle.max_members { return Err(AjoError::CircleAtCapacity); }
 
         let mut member_data = members.get(member.clone()).ok_or(AjoError::NotFound)?;
 
@@ -393,6 +389,7 @@ impl AjoCircle {
     pub fn partial_withdraw(env: Env, member: Address) -> Result<i128, AjoError> {
         Self::require_not_paused(&env)?;
         member.require_auth();
+        Self::require_not_panicked(&env)?;
 
         let circle: CircleData = env
             .storage()
@@ -499,6 +496,7 @@ impl AjoCircle {
         if status != CircleStatus::VotingForDissolution {
             return Err(AjoError::NoActiveVote);
         }
+        env.storage().instance().set(&DataKey::Members, &members);
 
         let mut vote: DissolutionVote = env
             .storage()
