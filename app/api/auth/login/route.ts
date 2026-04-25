@@ -32,6 +32,15 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        firstName: true,
+        lastName: true,
+        walletAddress: true,
+        verified: true,
+      },
     });
 
     if (!user) {
@@ -41,6 +50,14 @@ export async function POST(request: NextRequest) {
     const isValidPassword = await verifyPassword(password, user.password);
     if (!isValidPassword) {
       return errorResponse(request, { code: 'invalid_credentials', message: 'Invalid email or password' }, 401);
+    }
+
+    if (!user.verified) {
+      return errorResponse(
+        request,
+        { code: 'email_not_verified', message: 'Please verify your email address before logging in.' },
+        403,
+      );
     }
 
     const token = generateToken({

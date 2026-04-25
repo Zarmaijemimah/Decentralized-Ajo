@@ -4,12 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import {
   hashPassword,
-  generateToken,
   validatePasswordStrength,
-  generateRefreshToken,
-  REFRESH_TOKEN_COOKIE_NAME,
-  getRefreshTokenExpiryDate,
-  isSecureCookieEnvironment,
 } from '@/lib/auth';
 import { validateBody, applyRateLimit } from '@/lib/api-helpers';
 import { RegisterSchema } from '@/lib/validations/auth';
@@ -86,21 +81,10 @@ export async function POST(request: NextRequest) {
       logger.error('Failed to send verification email during registration', { err, userId: user.newUser.id });
     });
 
-    const token = generateToken({ userId: user.newUser.id, email: user.newUser.email });
-    const refreshToken = await generateRefreshToken(user.newUser.id);
-
-    const response = NextResponse.json({ success: true, user: user.newUser, token }, { status: 201 });
-    response.cookies.set({
-      name: REFRESH_TOKEN_COOKIE_NAME,
-      value: refreshToken,
-      httpOnly: true,
-      secure: isSecureCookieEnvironment(),
-      sameSite: 'lax',
-      path: '/',
-      expires: getRefreshTokenExpiryDate(),
-    });
-
-    return response;
+    return NextResponse.json(
+      { success: true, message: 'Registration successful. Please check your email to verify your account.' },
+      { status: 201 },
+    );
   } catch (err) {
     logger.error('Registration error', { err });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

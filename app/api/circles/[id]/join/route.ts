@@ -68,6 +68,17 @@ export async function POST(
   try {
     const { id } = await params;
 
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { verified: true },
+    });
+    if (!user?.verified) {
+      return NextResponse.json(
+        { error: 'Email verification required to join a circle.' },
+        { status: 403 },
+      );
+    }
+
     const circle = await prisma.circle.findUnique({
       where: { id },
       include: { members: true },
