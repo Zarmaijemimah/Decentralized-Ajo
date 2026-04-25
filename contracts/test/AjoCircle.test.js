@@ -1,4 +1,4 @@
-﻿const { expect } = require("chai");
+const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("AjoCircle", function () {
@@ -74,7 +74,8 @@ describe("AjoCircle", function () {
         contributionAmountUSD,
         7, // 7 days frequency
         12, // 12 rounds
-        5 // 5 members
+        5, // 5 members
+        false // Not private
       );
       
       const receipt = await tx.wait();
@@ -97,7 +98,8 @@ describe("AjoCircle", function () {
           0, // Invalid amount
           7,
           12,
-          5
+          5,
+          false
         )
       ).to.be.revertedWith("Invalid contribution amount");
 
@@ -107,7 +109,8 @@ describe("AjoCircle", function () {
           contributionAmountUSD,
           0, // Invalid frequency
           12,
-          5
+          5,
+          false
         )
       ).to.be.revertedWith("Invalid frequency");
     });
@@ -123,7 +126,8 @@ describe("AjoCircle", function () {
         contributionAmountUSD,
         7,
         12,
-        3
+        3,
+        false
       );
       const receipt = await tx.wait();
       circleId = receipt.events.find(e => e.event === "CircleCreated").args.circleId;
@@ -133,8 +137,8 @@ describe("AjoCircle", function () {
       await ajoCircle.connect(member1).joinCircle(circleId);
       
       const members = await ajoCircle.getCircleMembers(circleId);
-      expect(members.length).to.equal(2); // Owner + member1
-      expect(members[1]).to.equal(member1.address);
+      expect(members.length).to.equal(1);
+      expect(members[0]).to.equal(member1.address);
     });
 
     it("Should prevent duplicate membership", async function () {
@@ -165,11 +169,13 @@ describe("AjoCircle", function () {
         contributionAmountUSD,
         7,
         12,
-        3
+        3,
+        false
       );
       const receipt = await tx.wait();
       circleId = receipt.events.find(e => e.event === "CircleCreated").args.circleId;
       
+      await ajoCircle.joinCircle(circleId); // Organizer joins
       await ajoCircle.connect(member1).joinCircle(circleId);
       await ajoCircle.connect(member2).joinCircle(circleId);
     });
@@ -230,11 +236,13 @@ describe("AjoCircle", function () {
         contributionAmountUSD,
         7,
         12,
-        3
+        3,
+        false
       );
       const receipt = await tx.wait();
       circleId = receipt.events.find(e => e.event === "CircleCreated").args.circleId;
       
+      await ajoCircle.joinCircle(circleId); // Organizer joins
       await ajoCircle.connect(member1).joinCircle(circleId);
       await ajoCircle.connect(member2).joinCircle(circleId);
       
@@ -304,6 +312,7 @@ describe("AjoCircle", function () {
       const receipt = await tx.wait();
       circleId = receipt.events.find(e => e.event === "CircleCreated").args.circleId;
 
+      await ajoCircle.joinCircle(circleId); // Organizer joins
       await ajoCircle.connect(member1).joinCircle(circleId);
       await ajoCircle.connect(member2).joinCircle(circleId);
 
