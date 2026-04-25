@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar, Clock, ArrowRight } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/auth-client';
 import { formatDistanceToNow, addDays } from 'date-fns';
+import { formatAmount } from '@/lib/utils';
 
 interface Circle {
   id: string;
@@ -71,9 +72,7 @@ export function UpcomingCycles() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No active circles with upcoming cycles.
-          </p>
+          <p className="text-sm text-muted-foreground text-center py-4">No upcoming payment cycles</p>
         </CardContent>
       </Card>
     );
@@ -110,7 +109,7 @@ export function UpcomingCycles() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{circle.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    Round {circle.currentRound}/{circle.maxRounds} · {payout.toFixed(2)} XLM payout
+                    Round {circle.currentRound}/{circle.maxRounds} · {formatAmount(payout)} XLM payout
                   </p>
                 </div>
               </div>

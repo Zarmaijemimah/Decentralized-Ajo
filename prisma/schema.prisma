@@ -32,6 +32,7 @@ model User {
   profilePicture String?
   bio       String?
   verified  Boolean  @default(false)
+  emailVerifiedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -43,11 +44,25 @@ model User {
   withdrawals Withdrawal[]
   refreshTokens RefreshToken[]
   notifications Notification[]
+  deadlineReminders DeadlineReminder[]
+  verificationTokens VerificationToken[]
   
   // New Ajo Group Relations
   ajos          UserAjo[]
   ajoParticipations UserAjoParticipation[]
   settings      UserSettings?
+  activityLogs  ActivityLog[]
+}
+
+model VerificationToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model UserSettings {
@@ -68,8 +83,11 @@ model RefreshToken {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
+  rotatedAt DateTime?
+  familyId  String   @default(cuid())
 
   @@index([userId])
+  @@index([familyId])
 }
 
 model Circle {
@@ -103,6 +121,7 @@ model Circle {
   governance GovernanceProposal[]
   withdrawals Withdrawal[]
   ajoParticipants UserAjoParticipation[] @relation("ajoParticipants")
+  deadlineReminders DeadlineReminder[]
 
   @@index([organizerId])
   @@index([status])
@@ -167,6 +186,7 @@ model Contribution {
 
   @@index([circleId])
   @@index([userId])
+  @@index([userId, createdAt])
   @@index([status])
   @@index([circleId, status])
   @@index([userId, status])
@@ -367,6 +387,23 @@ model Notification {
   @@index([userId, read])
 }
 
+model DeadlineReminder {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  circleId  String
+  circle    Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
+
+  round     Int
+  leadTimeHours Int
+  notifiedAt DateTime @default(now())
+
+  @@unique([userId, circleId, round, leadTimeHours])
+  @@index([userId])
+  @@index([circleId])
+  @@index([circleId, round])
+}
+
 enum NotificationType {
   CONTRIBUTION_REMINDER
   PAYOUT_TURN
@@ -408,4 +445,17 @@ model UserAjo {
   @@id([userAddress, ajoId])
   @@index([userAddress])
   @@index([ajoId])
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action      String
+  description String?
+  metadata    String?  // JSON string for extra context (circleId, amount, etc.)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, createdAt])
 }

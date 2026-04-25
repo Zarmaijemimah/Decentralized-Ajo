@@ -49,8 +49,19 @@ module.exports = {
       chainId: 1,
     },
   },
+  // @nomicfoundation/hardhat-verify resolves the key by network name.
+  // Add more networks here (e.g. mainnet, polygon) as needed.
   etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
+    apiKey: {
+      sepolia: ETHERSCAN_API_KEY || "",
+      mainnet: ETHERSCAN_API_KEY || "",
+    },
+    customChains: [],
+  },
+
+  // Sourcify: decentralised fallback (no API key needed).
+  sourcify: {
+    enabled: true,
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS === "true",
