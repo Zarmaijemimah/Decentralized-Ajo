@@ -1,336 +1,298 @@
-# 🚀 Quick Reference Guide - Reentrancy Protection
+# AjoFactory Deployment - Quick Reference Card
 
----
-
-## 📦 Deliverables Checklist
-
-- [x] **AjoCircle.sol** - Secure smart contract with dual protection
-- [x] **AttackerContract.sol** - Malicious contract for exploit simulation
-- [x] **AjoCircle.reentrancy.test.ts** - Comprehensive test suite (9 tests)
-- [x] **hardhat.config.ts** - Hardhat configuration
-- [x] **deploy.ts** - Deployment script
-- [x] **SECURITY_AUDIT.md** - Full security documentation
-- [x] **SETUP_HARDHAT.md** - Installation and setup guide
-- [x] **REENTRANCY_ATTACK_FLOW.md** - Visual attack flow diagrams
-
----
-
-## ⚡ Quick Start
+## 🚀 3-Step Quick Deploy
 
 ```bash
-# 1. Install dependencies
-npm install
+# 1. Setup
+pnpm install && cp .env.example .env
 
-# 2. Compile contracts
-npx hardhat compile
+# 2. Configure .env with:
+#    - SEPOLIA_RPC_URL
+#    - SEPOLIA_PRIVATE_KEY
+#    - ETHERSCAN_API_KEY (optional)
 
-# 3. Run security tests
-npx hardhat test test/AjoCircle.reentrancy.test.ts
-
-# 4. Deploy locally
-npx hardhat node                    # Terminal 1
-npx hardhat run scripts/deploy.ts   # Terminal 2
+# 3. Deploy
+pnpm contract:deploy:sepolia
 ```
 
 ---
 
-## 🔒 Security Features
+## 📋 Essential Commands
 
-### ✅ Implemented Protections
-
-| Feature | Status | Location |
-|---------|--------|----------|
-| ReentrancyGuard | ✅ Active | All state-changing functions |
-| CEI Pattern | ✅ Implemented | contribute(), claimPayout(), partialWithdraw() |
-| Access Control | ✅ Ownable | Administrative functions |
-| Custom Errors | ✅ Gas Optimized | All error cases |
-| Input Validation | ✅ Complete | All public functions |
-| Event Logging | ✅ Comprehensive | All state changes |
-
----
-
-## 🎯 Key Functions Protected
-
-### contribute()
-```solidity
-function contribute() external payable nonReentrant {
-    // CHECKS
-    require(msg.value > 0);
-    require(member exists);
-    
-    // EFFECTS (state updated FIRST)
-    member.totalContributed += msg.value;
-    circle.totalPoolBalance += msg.value;
-    
-    // INTERACTIONS (none - receiving ETH)
-    emit ContributionMade(msg.sender, msg.value);
-}
-```
-
-### claimPayout()
-```solidity
-function claimPayout() external nonReentrant returns (uint256) {
-    // CHECKS
-    require(member exists);
-    require(!hasReceivedPayout);
-    require(sufficient balance);
-    
-    // EFFECTS (state updated BEFORE external call)
-    member.hasReceivedPayout = true;
-    member.totalWithdrawn += payout;
-    circle.totalPoolBalance -= payout;
-    
-    // INTERACTIONS (external call LAST)
-    msg.sender.call{value: payout}("");
-    emit PayoutClaimed(msg.sender, payout);
-}
-```
-
-### partialWithdraw()
-```solidity
-function partialWithdraw(uint256 amount) external nonReentrant returns (uint256) {
-    // CHECKS
-    require(amount > 0);
-    require(member exists);
-    require(sufficient balance);
-    
-    // EFFECTS (state updated BEFORE external call)
-    member.totalWithdrawn += amount;
-    circle.totalPoolBalance -= netAmount;
-    
-    // INTERACTIONS (external call LAST)
-    msg.sender.call{value: netAmount}("");
-    emit PartialWithdrawal(msg.sender, netAmount, penalty);
-}
-```
-
----
-
-## 🧪 Test Results Summary
-
-```
-✅ 9/9 Tests Passing
-
-Reentrancy Attack Tests:
-  ✅ Block reentrancy on claimPayout()
-  ✅ Block reentrancy on partialWithdraw()
-  ✅ Allow legitimate claims after attack
-  ✅ Allow legitimate withdrawals after attack
-
-Mathematical Proof Tests:
-  ✅ CEI pattern verification
-  ✅ ReentrancyGuard verification
-  ✅ Defense-in-depth proof
-
-Performance Tests:
-  ✅ Gas optimization verification
-
-Security Tests:
-  ✅ State consistency verification
-```
-
----
-
-## 📊 Attack Simulation Results
-
-### Before Protection (Hypothetical)
-```
-Initial Balance: 4.0 ETH
-Attacker Claims: 5x recursive calls
-Stolen Amount: 20.0 ETH
-Result: ❌ CONTRACT DRAINED
-```
-
-### After Protection (Actual)
-```
-Initial Balance: 4.0 ETH
-Attacker Attempts: 5x recursive calls
-Stolen Amount: 0.0 ETH
-Result: ✅ ATTACK BLOCKED
-```
-
----
-
-## 🛡️ Defense Mechanisms
-
-### 1. ReentrancyGuard (OpenZeppelin)
-- **Type**: Mutex lock pattern
-- **Gas Cost**: ~2,400 gas per call
-- **Protection**: Blocks all recursive calls
-- **Coverage**: 100% of protected functions
-
-### 2. CEI Pattern
-- **Type**: Architectural pattern
-- **Gas Cost**: 0 (design pattern)
-- **Protection**: State consistency
-- **Coverage**: All external interactions
-
-### 3. Defense-in-Depth
-- **Redundancy**: 2x protection layers
-- **Failure Mode**: If one fails, other protects
-- **Security Level**: CRITICAL ✅
-
----
-
-## 💰 Gas Costs
-
-| Function | Gas Used | Acceptable? |
-|----------|----------|-------------|
-| contribute() | ~52,000 | ✅ Yes |
-| claimPayout() | ~78,000 | ✅ Yes |
-| partialWithdraw() | ~75,000 | ✅ Yes |
-| addMember() | ~45,000 | ✅ Yes |
-
-All functions remain under 100k gas despite security measures.
-
----
-
-## 🔍 Code Review Checklist
-
-- [x] All state-changing functions use `nonReentrant`
-- [x] All external calls follow CEI pattern
-- [x] State updates before external calls
-- [x] No state reads after external calls
-- [x] Custom errors for gas optimization
-- [x] Events emitted for transparency
-- [x] Access control on admin functions
-- [x] Input validation on all functions
-- [x] No integer overflow (Solidity 0.8+)
-- [x] No delegatecall to untrusted contracts
-- [x] No selfdestruct functionality
-- [x] 100% test coverage on critical paths
-
----
-
-## 📈 Security Metrics
-
-```
-Attack Vectors Tested: 9
-Attack Success Rate: 0% (0/9)
-Test Coverage: 100%
-Code Coverage: 100% (critical functions)
-Gas Efficiency: Optimized
-Security Level: PRODUCTION READY ✅
-```
-
----
-
-## 🚨 Critical Security Points
-
-### ✅ DO
-- Use `nonReentrant` on all functions that transfer value
-- Update state BEFORE external calls (CEI pattern)
-- Validate all inputs
-- Use custom errors for gas savings
-- Emit events for all state changes
-- Test with malicious contracts
-
-### ❌ DON'T
-- Make external calls before updating state
-- Remove `nonReentrant` modifier
-- Skip input validation
-- Ignore test failures
-- Deploy without security audit
-- Use `transfer()` or `send()` (use `call()` instead)
-
----
-
-## 📚 File Structure
-
-```
-contracts/solidity/
-├── AjoCircle.sol           # Main contract (SECURE)
-└── AttackerContract.sol    # Attack simulation
-
-test/
-└── AjoCircle.reentrancy.test.ts  # Security tests
-
-scripts/
-└── deploy.ts               # Deployment script
-
-Documentation/
-├── SECURITY_AUDIT.md       # Full audit report
-├── SETUP_HARDHAT.md        # Setup instructions
-├── REENTRANCY_ATTACK_FLOW.md  # Visual diagrams
-└── QUICK_REFERENCE.md      # This file
-```
-
----
-
-## 🎓 Learning Resources
-
-1. **OpenZeppelin ReentrancyGuard**
-   - https://docs.openzeppelin.com/contracts/4.x/api/security#ReentrancyGuard
-
-2. **CEI Pattern**
-   - https://docs.soliditylang.org/en/latest/security-considerations.html
-
-3. **SWC-107: Reentrancy**
-   - https://swcregistry.io/docs/SWC-107
-
-4. **The DAO Hack Analysis**
-   - https://hackingdistributed.com/2016/06/18/analysis-of-the-dao-exploit/
-
-5. **Smart Contract Best Practices**
-   - https://consensys.github.io/smart-contract-best-practices/
-
----
-
-## 🔧 Troubleshooting
-
-### Tests Failing?
 ```bash
-npx hardhat clean
-npx hardhat compile
-npx hardhat test
+# Compile
+pnpm contract:compile
+
+# Deploy to Sepolia
+pnpm contract:deploy:sepolia          # ⭐ MAIN COMMAND
+
+# Test
+pnpm contract:test
+pnpm contract:test:gas
+
+# Check status
+npx hardhat run scripts/check-deployment.ts --network sepolia
+
+# Verify on Etherscan
+pnpm contract:verify
 ```
 
-### Compilation Errors?
+---
+
+## 🔑 Environment Variables (.env)
+
+```env
+# REQUIRED for Sepolia deployment
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
+SEPOLIA_PRIVATE_KEY=your_private_key_without_0x
+
+# OPTIONAL but recommended
+ETHERSCAN_API_KEY=your_api_key
+```
+
+---
+
+## 🌐 Network Details
+
+| Property | Value |
+|----------|-------|
+| Network | Sepolia Testnet |
+| Chain ID | 11155111 |
+| Explorer | https://sepolia.etherscan.io/ |
+| RPC URL | https://sepolia.infura.io/v3/YOUR_KEY |
+| Faucet | https://sepoliafaucet.com/ |
+
+---
+
+## 📁 Important Files
+
+| File | Purpose |
+|------|---------|
+| `hardhat.config.ts` | Network config |
+| `scripts/deploy.ts` | Deployment script |
+| `contracts/ethereum/AjoFactory.sol` | Smart contract |
+| `DEPLOYMENT_WORKFLOW.md` | Quick guide |
+| `DEPLOYMENT_SEPOLIA.md` | Full guide |
+
+---
+
+## ✅ Pre-Deployment Checklist
+
+- [ ] Node.js v18+ installed
+- [ ] `pnpm install` completed
+- [ ] `.env` file configured
+- [ ] Testnet ETH obtained (> 0.1 ETH)
+- [ ] `pnpm contract:compile` passes
+- [ ] Ready to deploy!
+
+---
+
+## 🔗 Key Links
+
+- Sepolia Faucet: https://sepoliafaucet.com/
+- Etherscan: https://sepolia.etherscan.io/
+- Hardhat Docs: https://hardhat.org/docs
+- Ethers.js Docs: https://docs.ethers.org/v6/
+
+---
+
+## 📊 Expected Output
+
+After successful deployment:
+
+```
+✅ Pre-flight checks passed!
+✅ AjoFactory deployed successfully!
+
+📍 Contract Address: 0x...
+📊 Deployment TX: 0x...
+📦 Block Number: 1234567
+💰 Gas Used: 1,123,456
+
+✅ Contract verified on Etherscan!
+🔗 View on Etherscan: https://sepolia.etherscan.io/address/0x...
+```
+
+---
+
+## 🆘 Quick Troubleshooting
+
+| Error | Solution |
+|-------|----------|
+| "Insufficient Funds" | Get testnet ETH from faucet |
+| "RPC URL not set" | Add SEPOLIA_RPC_URL to .env |
+| "Invalid Private Key" | Remove 0x prefix, check format |
+| "Already verified" | Expected, can skip |
+
+---
+
+## 📞 Useful Commands
+
 ```bash
-npm install @openzeppelin/contracts
-npx hardhat compile
+# See Sepolia accounts
+npx hardhat accounts --network sepolia
+
+# Clean and rebuild
+pnpm contract:clean && pnpm contract:compile
+
+# Check deployment status
+npx hardhat run scripts/check-deployment.ts --network sepolia
+
+# Run local tests
+pnpm contract:test
+
+# Start local Hardhat node
+pnpm hardhat:node
 ```
 
-### Deployment Issues?
+---
+
+## 🎯 Deployment Flow
+
+```
+1. pnpm install              # Install dependencies
+2. Configure .env            # Add credentials
+3. Get testnet ETH          # Visit faucet
+4. pnpm contract:compile    # Verify compilation
+5. pnpm contract:test       # Run tests (optional)
+6. pnpm contract:deploy:sepolia  # DEPLOY ⭐
+7. Verify on Etherscan      # Check verification
+8. Integrate frontend       # Use contract
+```
+
+---
+
+## 💾 After Deployment
+
+**Contract Address Location:**
+- Output console
+- `deployments/sepolia-deployments.json`
+- Etherscan link
+
+**Frontend Artifacts:**
+- `frontend/constants/deployments/sepolia-addresses.json`
+- Ready to import in React
+
+---
+
+## 🔐 Security Checklist
+
+- ✅ .env in .gitignore
+- ✅ Private key secure
+- ✅ Never commit .env
+- ✅ Use testnet keys only
+- ✅ Verify contracts on Etherscan
+
+---
+
+## 📖 Documentation Files
+
+1. **DEPLOYMENT_START_HERE.md** ← Start here!
+2. **DEPLOYMENT_WORKFLOW.md** - Quick reference
+3. **DEPLOYMENT_SEPOLIA.md** - Complete guide
+4. **FRONTEND_INTEGRATION.md** - Frontend usage
+5. **DEPLOYMENT_CHECKLIST.md** - Deployment tracking
+
+---
+
+## 🚀 One-Liner Deploy
+
 ```bash
-# Start local node
-npx hardhat node
+pnpm install && cp .env.example .env && pnpm contract:deploy:sepolia
+```
 
-# Deploy (in new terminal)
-npx hardhat run scripts/deploy.ts --network localhost
+(Remember to configure .env first!)
+
+---
+
+## 📱 Frontend Integration
+
+```typescript
+// Import deployment config
+import deployments from '@/constants/deployments/sepolia-addresses.json'
+
+// Get contract details
+const address = deployments.contracts.AjoFactory.address
+const abi = deployments.contracts.AjoFactory.abi
+
+// Use with ethers.js
+import { ethers } from 'ethers'
+const contract = new ethers.Contract(address, abi, provider)
 ```
 
 ---
 
-## ✅ Acceptance Criteria Met
+## 🎓 Learning Path
 
-- [x] Reentrancy vulnerability patched
-- [x] ReentrancyGuard implemented
-- [x] CEI pattern applied
-- [x] Attacker contract created
-- [x] Test suite passes (9/9 tests)
-- [x] Mathematical proof provided
-- [x] Function signatures unchanged
-- [x] Gas costs optimized
-- [x] Comprehensive documentation
-- [x] Deployment script included
+1. **First time?**
+   → Read DEPLOYMENT_START_HERE.md
 
----
+2. **Need to deploy?**
+   → Follow DEPLOYMENT_WORKFLOW.md
 
-## 🎉 Summary
+3. **Want all details?**
+   → Read DEPLOYMENT_SEPOLIA.md
 
-The AjoCircle smart contract is now **SECURE** against reentrancy attacks with:
+4. **Frontend developer?**
+   → Check FRONTEND_INTEGRATION.md
 
-- ✅ **Dual Protection**: ReentrancyGuard + CEI Pattern
-- ✅ **100% Test Coverage**: All attack vectors blocked
-- ✅ **Mathematical Proof**: Reentrancy is impossible
-- ✅ **Gas Optimized**: Reasonable costs maintained
-- ✅ **Production Ready**: Fully documented and tested
-
-**Security Status**: 🟢 APPROVED FOR DEPLOYMENT
+5. **Managing deployment?**
+   → Use DEPLOYMENT_CHECKLIST.md
 
 ---
 
-**Last Updated**: 2024
-**Version**: 1.0.0
-**Audit Status**: ✅ PASSED
+## ⏱️ Timeline
+
+| Time | Activity |
+|------|----------|
+| 5 min | Setup and configure |
+| 2 min | Get testnet ETH |
+| 5 min | Deploy and verify |
+| 15 min | Etherscan verification |
+| **27 min** | **Total time** |
+
+---
+
+## 💡 Pro Tips
+
+✅ Keep this card handy during deployment
+✅ Check Etherscan for real-time TX status
+✅ Save contract address immediately
+✅ Test frontend integration early
+✅ Monitor gas usage for optimization
+
+---
+
+## 🆘 Need Help?
+
+**Common Issues:**
+- See: DEPLOYMENT_SEPOLIA.md (Troubleshooting)
+- See: DEPLOYMENT_CHECKLIST.md (Troubleshooting Reference)
+
+**Resources:**
+- Hardhat: https://hardhat.org/docs
+- Ethers.js: https://docs.ethers.org/v6/
+- Solidity: https://docs.soliditylang.org/
+
+---
+
+## ✅ Deployment Success Criteria
+
+✅ Contract deployed to Sepolia
+✅ Address visible in output
+✅ Tx confirmed on Etherscan
+✅ Contract verified on Etherscan
+✅ Artifacts saved to frontend
+✅ Frontend can import config
+✅ Contract readable on Etherscan
+
+---
+
+**Ready?** Run: `pnpm contract:deploy:sepolia`
+
+**Questions?** Check DEPLOYMENT_SEPOLIA.md
+
+---
+
+*AjoFactory Ethereum Deployment - Quick Reference*
+*Version 1.0 | March 2024*

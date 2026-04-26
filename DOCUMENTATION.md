@@ -11,6 +11,7 @@ Complete guide to all documentation for the Stellar Ajo project.
 | [PROJECT_SUMMARY.md](./PROJECT_SUMMARY.md) | Detailed project overview | 10 min |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Development workflow and debugging | 20 min |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Production deployment guide | 20 min |
+| [TRANSACTION_HISTORY.md](./docs/TRANSACTION_HISTORY.md) | Transaction history system guide | 10 min |
 
 ## Start Here
 
@@ -41,6 +42,7 @@ Follow **[DEPLOYMENT.md](./DEPLOYMENT.md)** for production deployment steps.
 ### Development
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Dev workflow, testing, debugging
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment
+- **[TRANSACTION_HISTORY.md](./docs/TRANSACTION_HISTORY.md)** - Transaction history system guide
 
 ### Code Documentation
 - Smart contract comments in `contracts/ajo-circle/src/lib.rs`
@@ -214,7 +216,11 @@ All endpoints documented in [README.md#api-documentation](./README.md#api-docume
 - POST `/api/circles/:id/contribute`
 
 ### Users
-- PATCH `/api/users/update-wallet`
+- PATCH `/api/users/update-wallet` - Update wallet address (simple, no signature required)
+- GET `/api/auth/wallet/nonce` - Request a one-time challenge nonce
+- POST `/api/auth/wallet/verify` - Verify wallet ownership via Ed25519 signature
+
+See [docs/wallet-update-security.md](./docs/wallet-update-security.md) for the full security guide.
 
 ## Smart Contract Reference
 
@@ -251,6 +257,7 @@ Full details in [DEPLOYMENT.md](./DEPLOYMENT.md)
 - Database errors → [DEVELOPMENT.md](./DEVELOPMENT.md)
 - Module not found → [DEVELOPMENT.md](./DEVELOPMENT.md)
 - Wallet issues → [README.md](./README.md)
+- Wallet update security → [docs/wallet-update-security.md](./docs/wallet-update-security.md)
 - Contract deployment → [DEPLOYMENT.md](./DEPLOYMENT.md)
 
 ## Getting Help

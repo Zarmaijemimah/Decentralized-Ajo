@@ -10,10 +10,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { authenticatedFetch, clearAuthState } from '@/lib/auth-client';
 
 const profileSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(2, 'Last name must be at least 2 characters'),
+  username: z
+    .union([
+      z.literal(''),
+      z
+        .string()
+        .trim()
+        .min(2, 'Username must be at least 2 characters')
+        .max(32)
+        .regex(/^[a-zA-Z0-9_-]+$/, 'Only letters, numbers, underscores, and hyphens'),
+    ])
+    .optional(),
+  notificationEmail: z.union([z.literal(''), z.string().trim().email('Invalid email')]).optional(),
   phoneNumber: z.string().optional(),
   bio: z.string().max(160, 'Bio must be 160 characters or less').optional(),
 });
@@ -43,15 +56,25 @@ export function ProfileForm({ initialData, onSuccess }: ProfileFormProps) {
   const onSubmit = async (data: ProfileFormValues) => {
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/users/profile', {
+      const payload = {
+        ...data,
+        username: data.username === '' ? '' : data.username,
+        notificationEmail: data.notificationEmail === '' ? '' : data.notificationEmail,
+      };
+
+      const res = await authenticatedFetch('/api/users/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
+
+      if (res.status === 401) {
+        clearAuthState();
+        window.location.href = '/auth/login';
+        return;
+      }
 
       const json = await res.json();
 
@@ -77,17 +100,51 @@ export function ProfileForm({ initialData, onSuccess }: ProfileFormProps) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2 col-span-2 sm:col-span-1">
+          <Label htmlFor="username">Preferred username</Label>
+          <Input
+            id="username"
+            placeholder="savings-hero"
+            {...register('username')}
+            aria-invalid={!!errors.username}
+            aria-describedby={errors.username ? 'username-error' : undefined}
+            autoComplete="nickname"
+          />
+          {errors.username && (
+            <p id="username-error" role="alert" className="text-sm text-destructive">{errors.username.message}</p>
+          )}
+          <p className="text-xs text-muted-foreground">Letters, numbers, underscores, and hyphens. Optional.</p>
+        </div>
+
+        <div className="space-y-2 col-span-2 sm:col-span-1">
+          <Label htmlFor="notificationEmail">Notification email</Label>
+          <Input
+            id="notificationEmail"
+            type="email"
+            placeholder="alerts@example.com"
+            {...register('notificationEmail')}
+            aria-invalid={!!errors.notificationEmail}
+            aria-describedby={errors.notificationEmail ? 'notificationEmail-error' : undefined}
+            autoComplete="email"
+          />
+          {errors.notificationEmail && (
+            <p id="notificationEmail-error" role="alert" className="text-sm text-destructive">{errors.notificationEmail.message}</p>
+          )}
+          <p className="text-xs text-muted-foreground">Optional. Can differ from your login email.</p>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="firstName">First Name</Label>
           <Input
             id="firstName"
             placeholder="John"
             {...register('firstName')}
-            className={errors.firstName ? 'border-destructive' : ''}
+            aria-invalid={!!errors.firstName}
+            aria-describedby={errors.firstName ? 'firstName-error' : undefined}
           />
           {errors.firstName && (
-            <p className="text-sm text-destructive">{errors.firstName.message}</p>
+            <p id="firstName-error" role="alert" className="text-sm text-destructive">{errors.firstName.message}</p>
           )}
         </div>
 
@@ -97,10 +154,11 @@ export function ProfileForm({ initialData, onSuccess }: ProfileFormProps) {
             id="lastName"
             placeholder="Doe"
             {...register('lastName')}
-            className={errors.lastName ? 'border-destructive' : ''}
+            aria-invalid={!!errors.lastName}
+            aria-describedby={errors.lastName ? 'lastName-error' : undefined}
           />
           {errors.lastName && (
-            <p className="text-sm text-destructive">{errors.lastName.message}</p>
+            <p id="lastName-error" role="alert" className="text-sm text-destructive">{errors.lastName.message}</p>
           )}
         </div>
       </div>
@@ -127,22 +185,16 @@ export function ProfileForm({ initialData, onSuccess }: ProfileFormProps) {
           placeholder="Tell your circle members a bit about yourself..."
           rows={3}
           {...register('bio')}
-          className={errors.bio ? 'border-destructive' : ''}
+          aria-invalid={!!errors.bio}
+          aria-describedby={errors.bio ? 'bio-error' : undefined}
         />
         {errors.bio && (
-          <p className="text-sm text-destructive">{errors.bio.message}</p>
+          <p id="bio-error" role="alert" className="text-sm text-destructive">{errors.bio.message}</p>
         )}
       </div>
 
-      <Button type="submit" disabled={saving || !isDirty} className="w-full">
-        {saving ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Saving...
-          </>
-        ) : (
-          'Save Changes'
-        )}
+      <Button type="submit" disabled={!isDirty} isLoading={saving} className="w-full">
+        Save Changes
       </Button>
     </form>
   );

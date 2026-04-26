@@ -1,9 +1,35 @@
+/// <reference types="node" />
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import "@nomicfoundation/hardhat-ethers";
-import "@typechain/hardhat";
-import "hardhat-gas-reporter";
-import "solidity-coverage";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+// ⚠️  SECURITY WARNING ⚠️
+// NEVER hardcode private keys in this file.
+// Always use environment variables from a .env file.
+// Ensure .env is added to .gitignore
+// For production, use hardware wallets or secret management services.
+
+const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "";
+const SEPOLIA_PRIVATE_KEY = process.env.SEPOLIA_PRIVATE_KEY || "";
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
+
+if (!ETHERSCAN_API_KEY && process.env.NODE_ENV !== "test") {
+  console.warn(
+    "⚠️  ETHERSCAN_API_KEY is not set — contract verification will fail on Sepolia."
+  );
+}
+
+if (!SEPOLIA_RPC_URL && process.env.NODE_ENV === "production") {
+  console.warn("⚠️  SEPOLIA_RPC_URL is not set in .env");
+}
+
+if (!SEPOLIA_PRIVATE_KEY && process.env.NODE_ENV === "production") {
+  console.warn(
+    "⚠️  SEPOLIA_PRIVATE_KEY is not set in .env - cannot deploy to Sepolia"
+  );
+}
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -15,24 +41,65 @@ const config: HardhatUserConfig = {
       },
     },
   },
+
   networks: {
+    sepolia: {
+      url: SEPOLIA_RPC_URL,
+      accounts: SEPOLIA_PRIVATE_KEY ? [SEPOLIA_PRIVATE_KEY] : [],
+      chainId: 11155111,
+      // Gas settings for Sepolia (adjust as needed)
+      gasPrice: "auto",
+    },
+
+    // Local hardhat network for development
     hardhat: {
       chainId: 31337,
     },
+
+    // Optional: localhost network for running local node
+    localhost: {
+      url: "http://127.0.0.1:8545",
+    },
   },
+
+  // ─── Block-explorer verification ─────────────────────────────────────────
+  // @nomicfoundation/hardhat-verify resolves apiKey by network name.
+  // Add entries here when targeting additional chains (e.g. mainnet, polygon).
+  etherscan: {
+    apiKey: {
+      sepolia: ETHERSCAN_API_KEY,
+      mainnet: ETHERSCAN_API_KEY,
+    },
+    // Extend with custom chains that are not natively supported by hardhat-verify
+    customChains: [],
+  },
+
+  // Sourcify: decentralised, IPFS-backed verification (no API key required).
+  // Falls back to this if Etherscan verification is unavailable.
+  sourcify: {
+    enabled: true,
+  },
+
+  // Gas reporter
   gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
+    enabled: process.env.REPORT_GAS === "true",
     currency: "USD",
+    coinmarketcap: process.env.COINMARKETCAP_API_KEY || "",
+    outputFile: "gas-report.txt",
+    noColors: true,
   },
-  typechain: {
-    outDir: "typechain-types",
-    target: "ethers-v6",
-  },
+
+  // Paths
   paths: {
-    sources: "./contracts/solidity",
+    sources: "./contracts",
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts",
+  },
+
+  // Mocha test timeout
+  mocha: {
+    timeout: 40000,
   },
 };
 
