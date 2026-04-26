@@ -92,6 +92,8 @@ pub enum DataKey {
     TotalPool,
     LastDepositAt,
     CycleWithdrawals,
+    FeePool,      // i128 — accumulated dust/fees not yet distributed
+    PayoutCount,  // u32  — number of members who have claimed a payout this round
     // Role management keys
     RoleMembers,  // Map<RoleSymbol, Vec<Address>> - stores addresses per role
     Deployer,     // Original deployer address (cannot be changed - for critical operations)
@@ -551,22 +553,51 @@ impl AjoCircle {
 
         let payout = (circle.member_count as i128) * circle.contribution_amount;
 
-        member_data.total_withdrawn += payout;
+        // Track how many members have claimed; the last one receives any dust
+        let payout_count: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PayoutCount)
+            .unwrap_or(0);
+        let new_payout_count = payout_count + 1;
+        env.storage()
+            .instance()
+            .set(&DataKey::PayoutCount, &new_payout_count);
+
+        let is_final = new_payout_count >= circle.member_count;
+
+        let token_client = token::Client::new(&env, &circle.token_address);
+
+        // For the final recipient, sweep any remaining contract balance as dust
+        let actual_payout = if is_final {
+            let contract_balance = token_client.balance(&env.current_contract_address());
+            let fee_pool: i128 = env
+                .storage()
+                .instance()
+                .get(&DataKey::FeePool)
+                .unwrap_or(0);
+            // dust = everything left minus the established fee pool
+            let available = contract_balance - fee_pool;
+            if available > payout { available } else { payout }
+        } else {
+            payout
+        };
+
+        member_data.total_withdrawn += actual_payout;
         member_data.has_received_payout = true;
 
         members.set(member.clone(), member_data);
         env.storage().instance().set(&DataKey::Members, &members);
 
-        let token_client = token::Client::new(&env, &circle.token_address);
-        token_client.transfer(&env.current_contract_address(), &member, &payout);
+        token_client.transfer(&env.current_contract_address(), &member, &actual_payout);
 
         // Emit FundsWithdrawn event
         env.events().publish(
             (symbol_short!("withdraw"), member.clone()),
-            (payout, cycle, circle.current_round, env.ledger().timestamp())
+            (actual_payout, cycle, circle.current_round, env.ledger().timestamp())
         );
 
-        Ok(payout)
+        Ok(actual_payout)
     }
 
     // ---------------- GRACE PERIOD HELPER ----------------
@@ -763,6 +794,10 @@ impl AjoCircle {
     // ---------------- GETTER FUNCTIONS ----------------
     pub fn get_total_pool(env: Env) -> i128 {
         env.storage().instance().get(&DataKey::TotalPool).unwrap_or(0)
+    }
+
+    pub fn get_fee_pool(env: Env) -> i128 {
+        env.storage().instance().get(&DataKey::FeePool).unwrap_or(0)
     }
 
     pub fn get_member_balance(env: Env, member: Address) -> Result<MemberData, AjoError> {

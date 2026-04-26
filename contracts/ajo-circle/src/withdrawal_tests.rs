@@ -575,3 +575,80 @@ fn test_claim_payout_return_value_matches_calculation() {
     let member_data = client.get_member_balance(&organizer).unwrap();
     assert_eq!(member_data.total_withdrawn, expected_payout);
 }
+
+// ─── DUST HANDLING TESTS ──────────────────────────────────────────────────────
+
+#[test]
+fn test_final_recipient_receives_dust() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, AjoCircle);
+    let client = AjoCircleClient::new(&env, &contract_id);
+
+    let organizer = Address::generate(&env);
+    let admin = Address::generate(&env);
+    let token_address = env.register_stellar_asset_contract_v2(admin.clone()).address();
+    let token_admin = token::StellarAssetClient::new(&env, &token_address);
+
+    // 2-member circle, contribution = 100
+    token_admin.mint(&organizer, &10000_i128);
+    client.initialize_circle(&organizer, &token_address, &100_i128, &7_u32, &12_u32, &2_u32);
+
+    let member1 = Address::generate(&env);
+    token_admin.mint(&member1, &10000_i128);
+    client.add_member(&organizer, &member1);
+
+    // Both members deposit
+    client.deposit(&organizer);
+    client.deposit(&member1);
+
+    // Inject 3 extra tokens as dust directly into the contract
+    token_admin.mint(&client.address, &3_i128);
+
+    let token_client = token::Client::new(&env, &token_address);
+
+    // First payout — organizer gets standard payout (2 * 100 = 200)
+    let payout1 = client.withdraw(&organizer, &1_u32).unwrap();
+    assert_eq!(payout1, 200_i128);
+
+    // Second payout — member1 is final recipient, should receive 200 + 3 dust = 203
+    let balance_before = token_client.balance(&member1);
+    let payout2 = client.withdraw(&member1, &1_u32).unwrap();
+    assert_eq!(payout2, 203_i128);
+    assert_eq!(token_client.balance(&member1), balance_before + 203_i128);
+
+    // Contract balance should now be zero (no fee pool set)
+    assert_eq!(token_client.balance(&client.address), 0_i128);
+}
+
+#[test]
+fn test_non_final_recipient_gets_standard_payout() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, AjoCircle);
+    let client = AjoCircleClient::new(&env, &contract_id);
+
+    let organizer = Address::generate(&env);
+    let admin = Address::generate(&env);
+    let token_address = env.register_stellar_asset_contract_v2(admin.clone()).address();
+    let token_admin = token::StellarAssetClient::new(&env, &token_address);
+
+    token_admin.mint(&organizer, &10000_i128);
+    client.initialize_circle(&organizer, &token_address, &100_i128, &7_u32, &12_u32, &2_u32);
+
+    let member1 = Address::generate(&env);
+    token_admin.mint(&member1, &10000_i128);
+    client.add_member(&organizer, &member1);
+
+    client.deposit(&organizer);
+    client.deposit(&member1);
+
+    // Inject dust
+    token_admin.mint(&client.address, &5_i128);
+
+    // First payout — not the final recipient, gets exactly 200
+    let payout1 = client.withdraw(&organizer, &1_u32).unwrap();
+    assert_eq!(payout1, 200_i128);
+}
