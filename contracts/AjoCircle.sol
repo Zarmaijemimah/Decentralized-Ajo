@@ -25,25 +25,26 @@ contract AjoCircle is Ownable, ReentrancyGuard, Pausable {
     // ---------------- State Variables ----------------
     struct Circle {
         address organizer;
-        address tokenAddress; // Can be WETH for native ETH contributions
-        uint256 contributionAmountUSD; // Contribution amount in USD (8 decimals for Chainlink compatibility)
-        uint256 frequencyDays;
-        uint256 maxRounds;
-        uint256 currentRound;
-        uint256 memberCount;
-        uint256 maxMembers;
-        bool active;
-        uint256 createdAt;
+        address tokenAddress;
+        uint256 contributionAmountUSD;
+        uint32 createdAt;
+        uint16 frequencyDays;
+        uint16 maxRounds;
+        uint16 currentRound;
+        uint8 memberCount;
+        uint8 maxMembers;
+        bool isClosed;
+        bool isPrivate;
     }
 
     struct Member {
         address memberAddress;
         uint256 totalContributed;
         uint256 totalWithdrawn;
+        uint64 joinedAt;
+        uint32 missedContributions;
         bool hasReceivedPayout;
         bool isActive;
-        uint256 missedContributions;
-        uint256 joinedAt;
     }
 
     // ---------------- Mappings ----------------
@@ -54,6 +55,7 @@ contract AjoCircle is Ownable, ReentrancyGuard, Pausable {
     mapping(uint256 => uint256) public currentPayoutIndex;
     mapping(uint256 => uint256) public roundDeadline;
     mapping(uint256 => uint256) public totalPool;
+    mapping(uint256 => mapping(address => bool)) public whitelist;
     
     // ---------------- Counters ----------------
     uint256 public circleCounter;
@@ -90,6 +92,7 @@ contract AjoCircle is Ownable, ReentrancyGuard, Pausable {
     
     event CirclePaused(uint256 indexed circleId);
     event CircleResumed(uint256 indexed circleId);
+    event WhitelistedStatusChanged(uint256 indexed circleId, address indexed account, bool status);
     
     // ---------------- Errors ----------------
     error CircleNotFound();
@@ -100,6 +103,7 @@ contract AjoCircle is Ownable, ReentrancyGuard, Pausable {
     error InsufficientContribution();
     error PriceFeedUnavailable();
     error ArithmeticOverflow();
+    error NotWhitelisted();
 
     // ---------------- Modifiers ----------------
     modifier onlyCircleMember(uint256 _circleId) {
@@ -202,13 +206,15 @@ contract AjoCircle is Ownable, ReentrancyGuard, Pausable {
      * @param _frequencyDays Frequency in days
      * @param _maxRounds Maximum number of rounds
      * @param _maxMembers Maximum number of members
+     * @param _isPrivate Whether the circle is private (requires whitelisting)
      */
     function createCircle(
         address _tokenAddress,
         uint256 _contributionAmountUSD,
         uint256 _frequencyDays,
         uint256 _maxRounds,
-        uint256 _maxMembers
+        uint256 _maxMembers,
+        bool _isPrivate
     ) external whenNotPaused returns (uint256) {
         require(_contributionAmountUSD > 0, "Invalid contribution amount");
         require(_frequencyDays > 0, "Invalid frequency");
@@ -221,31 +227,22 @@ contract AjoCircle is Ownable, ReentrancyGuard, Pausable {
             organizer: msg.sender,
             tokenAddress: _tokenAddress,
             contributionAmountUSD: _contributionAmountUSD,
-            frequencyDays: _frequencyDays,
-            maxRounds: _maxRounds,
-            currentRound: 1,
-            memberCount: 1,
-            maxMembers: _maxMembers,
-            active: true,
-            createdAt: block.timestamp
+            frequencyDays: uint16(_frequencyDays),
+            maxRounds: uint16(_maxRounds),
+            currentRound: 0,
+            memberCount: 0,
+            maxMembers: uint8(_maxMembers),
+            isClosed: false,
+            isPrivate: _isPrivate,
+            createdAt: uint32(block.timestamp)
         });
 
-        // Add organizer as first member
-        members[circleId][msg.sender] = Member({
-            memberAddress: msg.sender,
-            totalContributed: 0,
-            totalWithdrawn: 0,
-            hasReceivedPayout: false,
-            isActive: true,
-            missedContributions: 0,
-            joinedAt: block.timestamp
-        });
-        
-        circleMembers[circleId].push(msg.sender);
-        
-        // Set initial round deadline
-        roundDeadline[circleId] = block.timestamp + (_frequencyDays * 1 days);
-        
+        // Automatically whitelist the organizer
+        if (_isPrivate) {
+            whitelist[circleId][msg.sender] = true;
+            emit WhitelistedStatusChanged(circleId, msg.sender, true);
+        }
+
         emit CircleCreated(
             circleId,
             msg.sender,
@@ -254,8 +251,6 @@ contract AjoCircle is Ownable, ReentrancyGuard, Pausable {
             _maxRounds,
             _frequencyDays
         );
-        
-        emit MemberJoined(circleId, msg.sender, 1);
         
         return circleId;
     }
@@ -275,14 +270,26 @@ contract AjoCircle is Ownable, ReentrancyGuard, Pausable {
         require(circle.memberCount < circle.maxMembers, "Circle at capacity");
         require(!isMember(_circleId, msg.sender), "Already a member");
 
+        if (circle.isPrivate) {
+            if (!whitelist[_circleId][msg.sender]) {
+                revert NotWhitelisted();
+            }
+        }
+
+        // Initialize round and deadline on first member join
+        if (circle.memberCount == 0) {
+            circle.currentRound = 1;
+            roundDeadline[_circleId] = block.timestamp + (uint256(circle.frequencyDays) * 1 days);
+        }
+
         members[_circleId][msg.sender] = Member({
             memberAddress: msg.sender,
             totalContributed: 0,
             totalWithdrawn: 0,
-            hasReceivedPayout: false,
-            isActive: true,
+            joinedAt: uint64(block.timestamp),
             missedContributions: 0,
-            joinedAt: block.timestamp
+            hasReceivedPayout: false,
+            isActive: true
         });
         
         circleMembers[_circleId].push(msg.sender);
@@ -495,6 +502,69 @@ contract AjoCircle is Ownable, ReentrancyGuard, Pausable {
      */
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /**
+     * @dev Add an address to the circle's whitelist
+     * @param _circleId Circle ID
+     * @param _account Address to whitelist
+     */
+    function addToWhitelist(uint256 _circleId, address _account) 
+        external 
+        circleExists(_circleId) 
+    {
+        require(circles[_circleId].organizer == msg.sender, "Only organizer can whitelist");
+        require(circles[_circleId].isPrivate, "Circle is not private");
+        require(_account != address(0), "Invalid address");
+        
+        whitelist[_circleId][_account] = true;
+        emit WhitelistedStatusChanged(_circleId, _account, true);
+    }
+
+    /**
+     * @dev Remove an address from the circle's whitelist
+     * @param _circleId Circle ID
+     * @param _account Address to remove
+     */
+    function removeFromWhitelist(uint256 _circleId, address _account) 
+        external 
+        circleExists(_circleId) 
+    {
+        require(circles[_circleId].organizer == msg.sender, "Only organizer can whitelist");
+        require(circles[_circleId].isPrivate, "Circle is not private");
+        
+        whitelist[_circleId][_account] = false;
+        emit WhitelistedStatusChanged(_circleId, _account, false);
+    }
+
+    /**
+     * @dev Batch add addresses to the circle's whitelist
+     * @param _circleId Circle ID
+     * @param _accounts Array of addresses to whitelist
+     */
+    function batchAddToWhitelist(uint256 _circleId, address[] calldata _accounts) 
+        external 
+        circleExists(_circleId) 
+    {
+        require(circles[_circleId].organizer == msg.sender, "Only organizer can whitelist");
+        require(circles[_circleId].isPrivate, "Circle is not private");
+        
+        for (uint256 i = 0; i < _accounts.length; i++) {
+            if (_accounts[i] != address(0)) {
+                whitelist[_circleId][_accounts[i]] = true;
+                emit WhitelistedStatusChanged(_circleId, _accounts[i], true);
+            }
+        }
+    }
+
+    /**
+     * @dev Check if an address is whitelisted for a circle
+     * @param _circleId Circle ID
+     * @param _account Address to check
+     * @return isWhitelisted True if address is whitelisted
+     */
+    function isWhitelisted(uint256 _circleId, address _account) public view returns (bool) {
+        return whitelist[_circleId][_account];
     }
 
     /**

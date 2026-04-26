@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { authenticatedFetch } from '@/lib/auth-client';
+import { NoNotificationsEmpty } from '@/components/ui/empty-states';
 
 interface Notification {
   id: string;
@@ -88,7 +89,7 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+        <Button variant="ghost" size="icon" className="relative min-h-[44px] min-w-[44px]" aria-label="Notifications">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
@@ -111,7 +112,7 @@ export function NotificationBell() {
         </div>
         <ScrollArea className="h-72">
           {notifications.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-10">No notifications yet</p>
+            <NoNotificationsEmpty />
           ) : (
             notifications.map((n) => (
               <button

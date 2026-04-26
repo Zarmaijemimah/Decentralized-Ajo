@@ -1,19 +1,26 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import logger from './config/logger';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
+
+import { createChildLogger } from './config/logger';
 import { requestLogger } from './middleware/requestLogger';
 import { startAjoCycleCronJob } from './services/ajo-cycle-cron';
 
 const app = express();
+const logger = createChildLogger({ service: 'express', module: 'server-index' });
+
+// ✅ FIXED PATH (go up one level)
+const swaggerDocument = YAML.load('../openapi.yaml');
 
 // Security middleware
 app.use(helmet());
 
 const allowedOrigins = [
   'http://localhost:3000',
-  /\\.vercel\\.app$/,
-  /\\.netlify\\.app$/
+  /\.vercel\.app$/,
+  /\.netlify\.app$/
 ];
 
 app.use(cors({
@@ -50,6 +57,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Request logging middleware
 app.use(requestLogger);
 
+// ✅ Swagger route
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ 
@@ -62,8 +72,7 @@ app.get('/health', (req: Request, res: Response) => {
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: any) => {
   logger.error('Unhandled error', {
-    error: err.message,
-    stack: err.stack,
+    err,
     url: req.url,
     method: req.method,
   });

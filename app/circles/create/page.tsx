@@ -12,6 +12,7 @@ import { Stepper } from '@/components/ui/stepper';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/auth-client';
+import { formatAmount } from '@/lib/utils';
 
 export default function CreateCirclePage() {
   const router = useRouter();
@@ -169,34 +170,55 @@ export default function CreateCirclePage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {currentStep === 0 && (
-                <div className="space-y-6">
-                  {/* Circle Name */}
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Circle Name *</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      placeholder="e.g., Office Savings Circle"
-                      value={formData.name}
-                      onChange={handleChange}
-                      className={errors.name ? 'border-destructive' : ''}
-                    />
-                    {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
-                  </div>
+              {/* Circle Name */}
+              <div className="space-y-2">
+                <Label htmlFor="name">Circle Name *</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  placeholder="e.g., Office Savings Circle"
+                  value={formData.name}
+                  onChange={handleChange}
+                  aria-invalid={!!errors.name}
+                  aria-describedby={errors.name ? 'name-error' : undefined}
+                />
+                {errors.name && <p id="name-error" role="alert" className="text-sm text-destructive">{errors.name}</p>}
+              </div>
 
-                  {/* Description */}
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      name="description"
-                      placeholder="Tell members about your circle..."
-                      value={formData.description}
-                      onChange={handleChange}
-                      rows={4}
-                    />
-                  </div>
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  placeholder="Tell members about your circle..."
+                  value={formData.description}
+                  onChange={handleChange}
+                  rows={4}
+                />
+              </div>
+
+              {/* Grid for Contribution Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Contribution Amount */}
+                <div className="space-y-2">
+                  <Label htmlFor="contributionAmount">
+                    Contribution Amount (XLM) *
+                  </Label>
+                  <Input
+                    id="contributionAmount"
+                    name="contributionAmount"
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 100"
+                    value={formData.contributionAmount}
+                    onChange={handleChange}
+                    aria-invalid={!!errors.contributionAmount}
+                    aria-describedby={errors.contributionAmount ? 'contributionAmount-error' : undefined}
+                  />
+                  {errors.contributionAmount && (
+                    <p id="contributionAmount-error" role="alert" className="text-sm text-destructive">{errors.contributionAmount}</p>
+                  )}
                 </div>
               )}
 
@@ -246,64 +268,72 @@ export default function CreateCirclePage() {
                     </div>
                   </div>
 
-                  {/* Max Rounds */}
-                  <div className="space-y-2">
-                    <Label htmlFor="maxRounds">Number of Rounds *</Label>
-                    <Input
-                      id="maxRounds"
-                      name="maxRounds"
-                      type="number"
-                      placeholder="e.g., 12"
-                      value={formData.maxRounds}
-                      onChange={handleChange}
-                      className={errors.maxRounds ? 'border-destructive' : ''}
-                    />
-                    {errors.maxRounds && <p className="text-sm text-destructive">{errors.maxRounds}</p>}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Each round, one member receives the total pooled amount
+                {/* Frequency */}
+                <div className="space-y-2">
+                  <Label htmlFor="contributionFrequencyDays">
+                    Contribution Frequency (Days) *
+                  </Label>
+                  <Input
+                    id="contributionFrequencyDays"
+                    name="contributionFrequencyDays"
+                    type="number"
+                    placeholder="e.g., 7"
+                    value={formData.contributionFrequencyDays}
+                    onChange={handleChange}
+                    aria-invalid={!!errors.contributionFrequencyDays}
+                    aria-describedby={errors.contributionFrequencyDays ? 'contributionFrequencyDays-error' : undefined}
+                  />
+                  {errors.contributionFrequencyDays && (
+                    <p id="contributionFrequencyDays-error" role="alert" className="text-sm text-destructive">
+                      {errors.contributionFrequencyDays}
                     </p>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {currentStep === 2 && (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Circle Name</p>
-                      <p className="font-medium">{formData.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Contribution</p>
-                      <p className="font-medium">{formData.contributionAmount} XLM</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Frequency</p>
-                      <p className="font-medium">Every {formData.contributionFrequencyDays} days</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Rounds</p>
-                      <p className="font-medium">{formData.maxRounds} rounds</p>
-                    </div>
-                  </div>
-                  
-                  {/* Summary */}
-                  <div className="bg-secondary/10 p-4 rounded-lg">
-                    <h4 className="font-semibold text-foreground mb-2">Payout Summary</h4>
-                    <div className="space-y-1 text-sm">
-                      <p>
-                        <span className="text-muted-foreground">Payout Per Round:</span>{' '}
-                        <span className="font-semibold text-primary">
-                          {formData.contributionAmount && formData.maxRounds
-                            ? `${(parseFloat(formData.contributionAmount) * parseInt(formData.maxRounds)).toFixed(2)} XLM`
-                            : '-'}
-                        </span>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        This is the total amount each member will receive when it's their turn.
-                      </p>
-                    </div>
-                  </div>
+              {/* Max Rounds */}
+              <div className="space-y-2">
+                <Label htmlFor="maxRounds">Number of Rounds *</Label>
+                <Input
+                  id="maxRounds"
+                  name="maxRounds"
+                  type="number"
+                  placeholder="e.g., 12"
+                  value={formData.maxRounds}
+                  onChange={handleChange}
+                  aria-invalid={!!errors.maxRounds}
+                  aria-describedby={errors.maxRounds ? 'maxRounds-error' : undefined}
+                />
+                {errors.maxRounds && <p id="maxRounds-error" role="alert" className="text-sm text-destructive">{errors.maxRounds}</p>}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Each round, one member receives the total pooled amount
+                </p>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-secondary/10 p-4 rounded-lg">
+                <h4 className="font-semibold text-foreground mb-2">Circle Summary</h4>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">Per Member Contribution:</span>{' '}
+                    <span className="font-semibold">
+                      {formData.contributionAmount ? `${formData.contributionAmount} XLM` : '-'}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Payout Per Round:</span>{' '}
+                    <span className="font-semibold">
+                      {formData.contributionAmount && formData.maxRounds
+                        ? `${formatAmount(parseFloat(formData.contributionAmount) * parseInt(formData.maxRounds))} XLM`
+                        : '-'}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Frequency:</span>{' '}
+                    <span className="font-semibold">
+                      Every {formData.contributionFrequencyDays} days
+                    </span>
+                  </p>
                 </div>
               )}
 

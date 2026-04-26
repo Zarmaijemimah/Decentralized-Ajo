@@ -1,35 +1,23 @@
 'use client'
 
-import '@rainbow-me/rainbowkit/styles.css'
+// import '@rainbow-me/rainbowkit/styles.css'
 
-import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
+import { getDefaultConfig, RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 import { http } from 'viem'
 import { sepolia } from 'wagmi/chains'
-import { createConfig, WagmiProvider } from 'wagmi'
-import { metaMask, walletConnect } from 'wagmi/connectors'
+import { WagmiProvider } from 'wagmi'
 
-export function createWagmiConfig() {
-  const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
-
-  if (!projectId) {
-    throw new Error(
-      'NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not set. Add it to your .env.local file.'
-    )
-  }
-
-  return createConfig({
-    chains: [sepolia],
-    connectors: [metaMask(), walletConnect({ projectId })],
-    transports: {
-      [sepolia.id]: http(),
-    },
-    ssr: true,
-  })
-}
-
-export const wagmiConfig = createWagmiConfig()
+export const wagmiConfig = getDefaultConfig({
+  appName: 'Stellar Ajo',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'placeholder',
+  chains: [sepolia],
+  ssr: true,
+  transports: {
+    [sepolia.id]: http(),
+  },
+})
 const queryClient = new QueryClient()
 
 interface Web3ProviderProps {

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { verifyToken, extractToken } from '@/lib/auth';
-import { validateBody, applyRateLimit } from '@/lib/api-helpers';
+import { validateBody, applyRateLimit, authorize } from '@/lib/api-helpers';
 import { UpdateProfileSchema } from '@/lib/validations/user';
 import { RATE_LIMITS } from '@/lib/rate-limit';
+import { createChildLogger } from '@/lib/logger';
 
 const USER_SELECT = {
   id: true,
@@ -20,14 +20,13 @@ const USER_SELECT = {
   createdAt: true,
 };
 
+const logger = createChildLogger({ service: 'api', route: '/api/users/profile' });
+
 export async function GET(request: NextRequest) {
-  const token = extractToken(request.headers.get('authorization'));
-  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { payload, error } = await authorize(request, ['user:read']);
+  if (error) return error;
 
-  const payload = verifyToken(token);
-  if (!payload) return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
-
-  const rateLimited = applyRateLimit(request, RATE_LIMITS.api, 'users:profile-get', payload.userId);
+  const rateLimited = await applyRateLimit(request, RATE_LIMITS.api, 'users:profile', payload.userId);
   if (rateLimited) return rateLimited;
 
   try {
@@ -35,23 +34,23 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
     return NextResponse.json({ success: true, user });
   } catch (err) {
-    console.error('Get profile error:', err);
+    logger.error('Get profile error', { err, userId: payload.userId });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function PUT(request: NextRequest) {
-  const token = extractToken(request.headers.get('authorization'));
-  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { payload, error } = await authorize(request, ['user:write']);
+  if (error) return error;
 
-  const payload = verifyToken(token);
-  if (!payload || !payload.walletAddress) return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
+  // For users, we still need a walletAddress. For services, we might not.
+  const identifier = payload.walletAddress || payload.serviceName || payload.userId || 'unknown';
 
-  const rateLimited = applyRateLimit(request, RATE_LIMITS.api, 'users:profile-update', payload.walletAddress);
+  const rateLimited = await applyRateLimit(request, RATE_LIMITS.api, 'users:profile-update', identifier);
   if (rateLimited) return rateLimited;
 
-  const { data, error } = await validateBody(request, UpdateProfileSchema);
-  if (error) return error;
+  const { data, error: validationError } = await validateBody(request, UpdateProfileSchema);
+  if (validationError) return validationError;
 
   try {
     const user = await prisma.user.update({
@@ -79,7 +78,11 @@ export async function PUT(request: NextRequest) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       return NextResponse.json({ error: 'That username or email is already taken' }, { status: 409 });
     }
-    console.error('Update profile error:', err);
+    logger.error('Update profile error', {
+      err,
+      userId: payload.userId,
+      walletAddress: payload.walletAddress,
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
