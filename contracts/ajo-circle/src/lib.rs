@@ -17,6 +17,9 @@ mod penalty_tests;
 #[cfg(test)]
 mod test;
 
+#[cfg(test)]
+mod timelock_tests;
+
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env, Map,
     Symbol, Vec, BytesN,
@@ -31,6 +34,7 @@ pub const MAX_FREQUENCY_DAYS: u32 = 365;
 pub const MIN_ROUNDS: u32 = 2;
 pub const MAX_ROUNDS: u32 = 100;
 pub const WITHDRAWAL_PENALTY_PERCENT: u32 = 10;
+pub const UPGRADE_TIMELOCK_SECONDS: u64 = 48 * 3600; // 48 hours
 // LIMIT_SYNC_TAG: v1.0.2
 
 // ---------------- ROLE CONSTANTS ----------------
@@ -57,6 +61,7 @@ pub enum AjoError {
     PriceUnavailable = 15,
     ArithmeticOverflow = 16,
     Paused = 17,
+    TimelockNotReady = 18,
 }
 
 #[contracttype]
@@ -114,6 +119,13 @@ pub struct FeeConfig {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TimelockProposal {
+    pub new_wasm_hash: BytesN<32>,
+    pub unlock_time: u64,
+}
+
+#[contracttype]
 pub enum DataKey {
     Circle,
     /// Vec<Address> — ordered member list (used for iteration/shuffle only)
@@ -137,6 +149,8 @@ pub enum DataKey {
     LastDeposit(Address),
     /// Per-member KYC status — O(1) direct access
     KycVerified(Address),
+    /// Pending WASM upgrade proposal (timelock)
+    PendingUpgrade,
 }
 
 #[contract]
@@ -1160,9 +1174,30 @@ impl AjoCircle {
         Ok(())
     }
 
-    pub fn upgrade(env: Env, admin: Address, new_wasm_hash: BytesN<32>) -> Result<(), AjoError> {
+    pub fn propose_upgrade(env: Env, admin: Address, new_wasm_hash: BytesN<32>) -> Result<u64, AjoError> {
         Self::require_admin(&env, &admin)?;
-        env.deployer().update_current_contract_wasm(new_wasm_hash);
+        let unlock_time = env.ledger().timestamp() + UPGRADE_TIMELOCK_SECONDS;
+        let proposal = TimelockProposal { new_wasm_hash, unlock_time };
+        env.storage().instance().set(&DataKey::PendingUpgrade, &proposal);
+        env.events().publish(
+            (symbol_short!("upg_prop"), admin),
+            (unlock_time,),
+        );
+        Ok(unlock_time)
+    }
+
+    pub fn execute_upgrade(env: Env, admin: Address) -> Result<(), AjoError> {
+        Self::require_admin(&env, &admin)?;
+        let proposal: TimelockProposal = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgrade)
+            .ok_or(AjoError::NotFound)?;
+        if env.ledger().timestamp() < proposal.unlock_time {
+            return Err(AjoError::TimelockNotReady);
+        }
+        env.storage().instance().remove(&DataKey::PendingUpgrade);
+        env.deployer().update_current_contract_wasm(proposal.new_wasm_hash);
         Ok(())
     }
 }
