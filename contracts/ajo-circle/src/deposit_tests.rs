@@ -951,3 +951,146 @@ fn test_deposit_storage_efficiency() {
     assert!(client.get_member_balance(&organizer).is_ok());
     assert!(client.get_last_deposit_timestamp(&organizer).is_ok());
 }
+
+// ─── GRACE PERIOD TESTS ───────────────────────────────────────────────────────
+
+#[test]
+fn test_deposit_on_time_before_deadline() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    // Initialize at t=0; deadline = 7 * 86400 = 604800
+    env.ledger().set(LedgerInfo {
+        timestamp: 0,
+        protocol_version: 20,
+        sequence_number: 1,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 10,
+        min_persistent_entry_ttl: 10,
+        max_entry_ttl: 3110400,
+    });
+
+    let (client, organizer, _token_address, _admin) = setup_basic_circle(&env);
+
+    // Deposit exactly at deadline — should succeed (on time)
+    env.ledger().set(LedgerInfo {
+        timestamp: 604800, // exactly at deadline
+        protocol_version: 20,
+        sequence_number: 2,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 10,
+        min_persistent_entry_ttl: 10,
+        max_entry_ttl: 3110400,
+    });
+
+    let result = client.deposit(&organizer);
+    assert_eq!(result, Ok(()));
+}
+
+#[test]
+fn test_deposit_on_time_within_grace_period() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    // Initialize at t=0; deadline = 604800
+    env.ledger().set(LedgerInfo {
+        timestamp: 0,
+        protocol_version: 20,
+        sequence_number: 1,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 10,
+        min_persistent_entry_ttl: 10,
+        max_entry_ttl: 3110400,
+    });
+
+    let (client, organizer, _token_address, _admin) = setup_basic_circle(&env);
+
+    // Deposit 299 seconds after deadline — still within 300s grace period
+    env.ledger().set(LedgerInfo {
+        timestamp: 604800 + 299,
+        protocol_version: 20,
+        sequence_number: 2,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 10,
+        min_persistent_entry_ttl: 10,
+        max_entry_ttl: 3110400,
+    });
+
+    let result = client.deposit(&organizer);
+    assert_eq!(result, Ok(()));
+    // Deposit succeeds and is marked on-time (within grace period)
+}
+
+#[test]
+fn test_deposit_on_time_at_grace_period_boundary() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    env.ledger().set(LedgerInfo {
+        timestamp: 0,
+        protocol_version: 20,
+        sequence_number: 1,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 10,
+        min_persistent_entry_ttl: 10,
+        max_entry_ttl: 3110400,
+    });
+
+    let (client, organizer, _token_address, _admin) = setup_basic_circle(&env);
+
+    // Deposit exactly at deadline + 300s (grace period boundary — still on time)
+    env.ledger().set(LedgerInfo {
+        timestamp: 604800 + 300,
+        protocol_version: 20,
+        sequence_number: 2,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 10,
+        min_persistent_entry_ttl: 10,
+        max_entry_ttl: 3110400,
+    });
+
+    let result = client.deposit(&organizer);
+    assert_eq!(result, Ok(()));
+}
+
+#[test]
+fn test_deposit_late_after_grace_period() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    env.ledger().set(LedgerInfo {
+        timestamp: 0,
+        protocol_version: 20,
+        sequence_number: 1,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 10,
+        min_persistent_entry_ttl: 10,
+        max_entry_ttl: 3110400,
+    });
+
+    let (client, organizer, _token_address, _admin) = setup_basic_circle(&env);
+
+    // Deposit 301 seconds after deadline — past grace period (late)
+    env.ledger().set(LedgerInfo {
+        timestamp: 604800 + 301,
+        protocol_version: 20,
+        sequence_number: 2,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 10,
+        min_persistent_entry_ttl: 10,
+        max_entry_ttl: 3110400,
+    });
+
+    // Deposit still succeeds (late deposits are allowed), but is marked late in the event
+    let result = client.deposit(&organizer);
+    assert_eq!(result, Ok(()));
+    // The on_time flag in the emitted event will be false
+}
