@@ -4,6 +4,7 @@
 #![no_std]
 
 pub mod factory;
+pub mod events;
 
 #[cfg(test)]
 mod deposit_tests;
@@ -21,6 +22,17 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env, Map,
     Symbol, Vec, BytesN,
 };
+use crate::events::{
+    CircleInitEvent, MemberEvent, ContributionEvent, WithdrawalEvent,
+    PartialWithdrawalEvent, EmergencyRefundEvent, VoteEvent, DissolutionEvent,
+    StatusChangeEvent, RoleEvent, FeeConfigEvent,
+    emit_circle_initialized, emit_member_added, emit_contribution, emit_deposit,
+    emit_payout, emit_partial_withdrawal, emit_emergency_refund,
+    emit_dissolution_started, emit_dissolution_passed, emit_vote_cast,
+    emit_panic, emit_resume, emit_role_granted, emit_role_revoked,
+    emit_fee_config, emit_status_change,
+};
+
 
 pub const MAX_MEMBERS: u32 = 50;
 pub const HARD_CAP: u32 = 100;
@@ -531,10 +543,14 @@ impl AjoCircle {
             );
         }
 
-        env.events().publish(
-            (symbol_short!("deposit"), member.clone()),
-            (amount, circle.current_round),
-        );
+        // Emit structured deposit event
+        emit_deposit(&env, &ContributionEvent {
+            member: member.clone(),
+            amount,
+            round: circle.current_round,
+            total_contributed: member_data.total_contributed,
+            timestamp: env.ledger().timestamp(),
+        });
 
         Ok(())
     }
@@ -607,10 +623,14 @@ impl AjoCircle {
         let token_client = token::Client::new(&env, &circle.token_address);
         token_client.transfer(&env.current_contract_address(), &member, &payout);
 
-        env.events().publish(
-            (symbol_short!("withdraw"), member.clone(), env.current_contract_address()),
-            (payout, cycle, circle.current_round),
-        );
+        // Emit structured payout event
+        emit_payout(&env, &WithdrawalEvent {
+            member: member.clone(),
+            amount: payout,
+            cycle,
+            current_round: circle.current_round,
+            timestamp: env.ledger().timestamp(),
+        });
 
         Ok(payout)
     }
@@ -694,10 +714,13 @@ impl AjoCircle {
         env.storage().instance().set(&DataKey::CircleStatus, &CircleStatus::VotingForDissolution);
         env.storage().instance().set(&DataKey::CycleWithdrawals, &vote);
 
-        env.events().publish(
-            (symbol_short!("dissolve"), symbol_short!("start"), env.current_contract_address()),
-            (threshold_mode, env.ledger().timestamp()),
-        );
+        // Emit structured dissolution start event
+        emit_dissolution_started(&env, &DissolutionEvent {
+            initiator: caller.clone(),
+            threshold_mode,
+            total_members: circle.member_count,
+            timestamp: env.ledger().timestamp(),
+        });
 
         Ok(())
     }
@@ -752,10 +775,8 @@ impl AjoCircle {
         if threshold_met {
             status = CircleStatus::Dissolved;
             env.storage().instance().set(&DataKey::CircleStatus, &status);
-            env.events().publish(
-                (symbol_short!("dissolve"), symbol_short!("passed"), env.current_contract_address()),
-                env.ledger().timestamp(),
-            );
+            // Emit structured dissolution passed event
+            emit_dissolution_passed(&env, env.ledger().timestamp());
         } else {
             env.storage().instance().set(&DataKey::CycleWithdrawals, &vote);
         }
@@ -773,10 +794,14 @@ impl AjoCircle {
             env.storage().instance().set(&DataKey::Members, &members);
         }
 
-        env.events().publish(
-            (symbol_short!("vote_cast"), member.clone(), env.current_contract_address()),
-            (1u32, vote.votes_for),
-        );
+        // Emit structured vote cast event
+        emit_vote_cast(&env, &VoteEvent {
+            voter: member.clone(),
+            votes_for: vote.votes_for,
+            total_votes: vote.total_members,
+            threshold_mode: vote.threshold_mode,
+            timestamp: env.ledger().timestamp(),
+        });
 
         Ok(())
     }
@@ -814,10 +839,13 @@ impl AjoCircle {
         let token_client = token::Client::new(&env, &circle.token_address);
         token_client.transfer(&env.current_contract_address(), &member, &refund);
 
-        env.events().publish(
-            (symbol_short!("withdraw"), member.clone(), env.current_contract_address()),
-            (refund, circle.current_round),
-        );
+        // Emit structured emergency refund event (dissolution)
+        emit_emergency_refund(&env, &EmergencyRefundEvent {
+            member: member.clone(),
+            amount: refund,
+            reason: symbol_short!("dissolve"),
+            timestamp: env.ledger().timestamp(),
+        });
 
         Ok(refund)
     }
@@ -862,10 +890,8 @@ impl AjoCircle {
     pub fn panic(env: Env, admin: Address) -> Result<(), AjoError> {
         Self::require_admin(&env, &admin)?;
         env.storage().instance().set(&DataKey::CircleStatus, &CircleStatus::Panicked);
-        env.events().publish(
-            ((symbol_short!("panic"),), admin.clone()),
-            env.ledger().timestamp(),
-        );
+        // Emit structured panic event
+        emit_panic(&env, &admin, env.ledger().timestamp());
         Ok(())
     }
 
@@ -890,10 +916,8 @@ impl AjoCircle {
     pub fn emergency_panic(env: Env, caller: Address) -> Result<(), AjoError> {
         Self::require_deployer(&env, &caller)?;
         env.storage().instance().set(&DataKey::CircleStatus, &CircleStatus::Panicked);
-        env.events().publish(
-            (symbol_short!("panic"),),
-            (caller, env.ledger().timestamp()),
-        );
+        // Emit structured panic event (emergency)
+        emit_panic(&env, &caller, env.ledger().timestamp());
         Ok(())
     }
 
@@ -974,10 +998,13 @@ impl AjoCircle {
             }
             role_members.set(role.clone(), updated);
             env.storage().instance().set(&DataKey::RoleMembers, &role_members);
-            env.events().publish(
-                (symbol_short!("role_rvk"), member, env.current_contract_address()),
-                (role, env.ledger().timestamp()),
-            );
+            // Emit structured role revoked event
+            emit_role_revoked(&env, &RoleEvent {
+                member: member.clone(),
+                role: role.clone(),
+                granted_by: caller.clone(),
+                timestamp: env.ledger().timestamp(),
+            });
         }
 
         Ok(())
@@ -1016,12 +1043,21 @@ impl AjoCircle {
         if fee_bps > 1000 {
             return Err(AjoError::InvalidInput);
         }
-        let config = FeeConfig { treasury, fee_bps };
+        // Get previous fee config for event
+        let previous_fee: u32 = env.storage().instance().get(&DataKey::FeeConfig)
+            .map(|c: FeeConfig| c.fee_bps)
+            .unwrap_or(0);
+
+        let config = FeeConfig { treasury: treasury.clone(), fee_bps };
         env.storage().instance().set(&DataKey::FeeConfig, &config);
-        env.events().publish(
-            (symbol_short!("fee_set"), admin),
-            (fee_bps, env.ledger().timestamp()),
-        );
+
+        // Emit structured fee config event
+        emit_fee_config(&env, &FeeConfigEvent {
+            treasury: treasury.clone(),
+            fee_bps,
+            previous_fee_bps: previous_fee,
+            timestamp: env.ledger().timestamp(),
+        });
         Ok(())
     }
 
