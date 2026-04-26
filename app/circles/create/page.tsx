@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft } from 'lucide-react';
+import { Stepper } from '@/components/ui/stepper';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/auth-client';
 import { formatAmount } from '@/lib/utils';
@@ -16,6 +17,7 @@ import { formatAmount } from '@/lib/utils';
 export default function CreateCirclePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -24,6 +26,55 @@ export default function CreateCirclePage() {
     maxRounds: '12',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const steps = [
+    { title: 'Basics', description: 'Circle identity' },
+    { title: 'Contributions', description: 'Amounts & Timing' },
+    { title: 'Review', description: 'Confirm details' },
+  ];
+
+  const nextStep = () => {
+    if (currentStep === 0) {
+      if (!formData.name) {
+        setErrors({ name: 'Circle name is required' });
+        return;
+      }
+      if (formData.name.length < 3) {
+        setErrors({ name: 'Circle name must be at least 3 characters' });
+        return;
+      }
+    }
+
+    if (currentStep === 1) {
+      const stepErrors: Record<string, string> = {};
+      if (!formData.contributionAmount) {
+        stepErrors.contributionAmount = 'Contribution amount is required';
+      } else if (parseFloat(formData.contributionAmount) <= 0) {
+        stepErrors.contributionAmount = 'Contribution amount must be greater than 0';
+      }
+
+      if (parseInt(formData.contributionFrequencyDays) <= 0) {
+        stepErrors.contributionFrequencyDays = 'Frequency must be greater than 0';
+      }
+
+      if (parseInt(formData.maxRounds) <= 0) {
+        stepErrors.maxRounds = 'Number of rounds must be greater than 0';
+      }
+
+      if (Object.keys(stepErrors).length > 0) {
+        setErrors(stepErrors);
+        return;
+      }
+    }
+
+    setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+    setErrors({});
+  };
+
+  const prevStep = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 0));
+    setErrors({});
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -40,41 +91,8 @@ export default function CreateCirclePage() {
     }
   };
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name) {
-      newErrors.name = 'Circle name is required';
-    } else if (formData.name.length < 3) {
-      newErrors.name = 'Circle name must be at least 3 characters';
-    }
-
-    if (!formData.contributionAmount) {
-      newErrors.contributionAmount = 'Contribution amount is required';
-    } else if (parseFloat(formData.contributionAmount) <= 0) {
-      newErrors.contributionAmount = 'Contribution amount must be greater than 0';
-    }
-
-    const frequency = parseInt(formData.contributionFrequencyDays);
-    if (frequency <= 0) {
-      newErrors.contributionFrequencyDays = 'Frequency must be greater than 0';
-    }
-
-    const rounds = parseInt(formData.maxRounds);
-    if (rounds <= 0) {
-      newErrors.maxRounds = 'Number of rounds must be greater than 0';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
 
     setLoading(true);
 
@@ -137,11 +155,17 @@ export default function CreateCirclePage() {
 
       {/* Form */}
       <div className="container mx-auto px-4 py-12 max-w-2xl">
+        <div className="mb-8">
+          <Stepper steps={steps} currentStep={currentStep} />
+        </div>
+
         <Card>
           <CardHeader>
-            <CardTitle>Circle Details</CardTitle>
+            <CardTitle>{steps[currentStep].title}</CardTitle>
             <CardDescription>
-              Set up the basic information for your savings circle. You can adjust settings later.
+              {currentStep === 0 && 'Set up the basic information for your savings circle.'}
+              {currentStep === 1 && 'Define how much and how often members will contribute.'}
+              {currentStep === 2 && 'Review your circle details before creating.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -196,6 +220,53 @@ export default function CreateCirclePage() {
                     <p id="contributionAmount-error" role="alert" className="text-sm text-destructive">{errors.contributionAmount}</p>
                   )}
                 </div>
+              )}
+
+              {currentStep === 1 && (
+                <div className="space-y-6">
+                  {/* Grid for Contribution Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Contribution Amount */}
+                    <div className="space-y-2">
+                      <Label htmlFor="contributionAmount">
+                        Contribution Amount (XLM) *
+                      </Label>
+                      <Input
+                        id="contributionAmount"
+                        name="contributionAmount"
+                        type="number"
+                        step="0.1"
+                        placeholder="e.g., 100"
+                        value={formData.contributionAmount}
+                        onChange={handleChange}
+                        className={errors.contributionAmount ? 'border-destructive' : ''}
+                      />
+                      {errors.contributionAmount && (
+                        <p className="text-sm text-destructive">{errors.contributionAmount}</p>
+                      )}
+                    </div>
+
+                    {/* Frequency */}
+                    <div className="space-y-2">
+                      <Label htmlFor="contributionFrequencyDays">
+                        Contribution Frequency (Days) *
+                      </Label>
+                      <Input
+                        id="contributionFrequencyDays"
+                        name="contributionFrequencyDays"
+                        type="number"
+                        placeholder="e.g., 7"
+                        value={formData.contributionFrequencyDays}
+                        onChange={handleChange}
+                        className={errors.contributionFrequencyDays ? 'border-destructive' : ''}
+                      />
+                      {errors.contributionFrequencyDays && (
+                        <p className="text-sm text-destructive">
+                          {errors.contributionFrequencyDays}
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
                 {/* Frequency */}
                 <div className="space-y-2">
@@ -216,7 +287,7 @@ export default function CreateCirclePage() {
                     <p id="contributionFrequencyDays-error" role="alert" className="text-sm text-destructive">
                       {errors.contributionFrequencyDays}
                     </p>
-                  )}
+                  </div>
                 </div>
               </div>
 
@@ -264,21 +335,45 @@ export default function CreateCirclePage() {
                     </span>
                   </p>
                 </div>
-              </div>
+              )}
 
               {/* Buttons */}
-              <div className="flex gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.back()}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" className="flex-1" disabled={loading}>
-                  {loading ? 'Creating...' : 'Create Circle'}
-                </Button>
+              <div className="flex gap-4 pt-4 border-t border-border">
+                {currentStep === 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => router.back()}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={prevStep}
+                    className="flex-1"
+                  >
+                    <ChevronLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Button>
+                )}
+
+                {currentStep === steps.length - 1 ? (
+                  <Button type="submit" className="flex-1" disabled={loading}>
+                    {loading ? 'Creating...' : 'Create Circle'}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={nextStep}
+                    className="flex-1"
+                  >
+                    Next
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
