@@ -266,6 +266,94 @@ Component stories are defined in `components/__stories__/`:
   - Validation errors
   - Long error messages
 
+### Accordion
+
+Located at `components/ui/accordion.tsx`. Built on [Radix UI Accordion](https://www.radix-ui.com/docs/primitives/components/accordion) with animated open/close transitions.
+
+**1. Single item open at a time (default)**
+
+```tsx
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
+
+<Accordion type="single" collapsible>
+  <AccordionItem value="fees">
+    <AccordionTrigger>What are the contribution fees?</AccordionTrigger>
+    <AccordionContent>
+      Stellar Ajo charges no platform fees. You only pay the Stellar network
+      transaction fee (~0.00001 XLM per operation).
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="payout">
+    <AccordionTrigger>How are payouts determined?</AccordionTrigger>
+    <AccordionContent>
+      Payout order is set when the circle is created and recorded on-chain.
+      Each member receives the full pool once per round.
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+```
+
+**2. Multiple items open simultaneously**
+
+```tsx
+<Accordion type="multiple" defaultValue={["eligibility"]}>
+  <AccordionItem value="eligibility">
+    <AccordionTrigger>Who can join a circle?</AccordionTrigger>
+    <AccordionContent>
+      Any user with a connected Stellar wallet can join an open circle or
+      be invited by the organizer.
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="withdraw">
+    <AccordionTrigger>Can I withdraw early?</AccordionTrigger>
+    <AccordionContent>
+      Partial withdrawals are allowed with a penalty. The penalty amount is
+      defined by the circle organizer at creation time.
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="governance">
+    <AccordionTrigger>How does governance work?</AccordionTrigger>
+    <AccordionContent>
+      Members submit proposals and vote on circle rule changes. A proposal
+      passes when it reaches the quorum threshold set by the organizer.
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+```
+
+**3. Disabled item + custom content**
+
+```tsx
+<Accordion type="single" collapsible>
+  <AccordionItem value="active">
+    <AccordionTrigger>Circle rules</AccordionTrigger>
+    <AccordionContent>
+      <ul className="list-disc pl-4 space-y-1">
+        <li>Contributions are due every 7 days.</li>
+        <li>Missing two consecutive payments triggers a governance vote.</li>
+        <li>Payout order is randomised at circle creation.</li>
+      </ul>
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="locked" disabled>
+    <AccordionTrigger>Advanced settings (organizer only)</AccordionTrigger>
+    <AccordionContent>
+      This section is only accessible to the circle organizer.
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+```
+
+**Accessibility notes**
+- Keyboard: `Enter` / `Space` toggles the focused item; `Tab` moves between triggers.
+- Each trigger renders as a `<button>` with `aria-expanded` and `aria-controls` managed automatically by Radix UI.
+- Pass `aria-label` to `<Accordion>` when the surrounding context doesn't provide a visible heading.
+
 ### Component Locations
 
 | Component | Location | Purpose |
@@ -273,6 +361,7 @@ Component stories are defined in `components/__stories__/`:
 | `AmountInput` | `components/ui/amount-input.tsx` | Cryptocurrency amount input with decimal validation |
 | `ProposalCard` | `components/governance/proposal-card.tsx` | Governance proposal display and voting interface |
 | `ErrorFallback` | `components/error-fallback.tsx` | Error boundary fallback for graceful error handling |
+| `Accordion` | `components/ui/accordion.tsx` | Collapsible content sections with animation |
 
 ## API Documentation
 
