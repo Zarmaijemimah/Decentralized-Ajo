@@ -8,13 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft } from 'lucide-react';
+import { Stepper } from '@/components/ui/stepper';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/auth-client';
 
 export default function CreateCirclePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -23,6 +25,55 @@ export default function CreateCirclePage() {
     maxRounds: '12',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const steps = [
+    { title: 'Basics', description: 'Circle identity' },
+    { title: 'Contributions', description: 'Amounts & Timing' },
+    { title: 'Review', description: 'Confirm details' },
+  ];
+
+  const nextStep = () => {
+    if (currentStep === 0) {
+      if (!formData.name) {
+        setErrors({ name: 'Circle name is required' });
+        return;
+      }
+      if (formData.name.length < 3) {
+        setErrors({ name: 'Circle name must be at least 3 characters' });
+        return;
+      }
+    }
+
+    if (currentStep === 1) {
+      const stepErrors: Record<string, string> = {};
+      if (!formData.contributionAmount) {
+        stepErrors.contributionAmount = 'Contribution amount is required';
+      } else if (parseFloat(formData.contributionAmount) <= 0) {
+        stepErrors.contributionAmount = 'Contribution amount must be greater than 0';
+      }
+
+      if (parseInt(formData.contributionFrequencyDays) <= 0) {
+        stepErrors.contributionFrequencyDays = 'Frequency must be greater than 0';
+      }
+
+      if (parseInt(formData.maxRounds) <= 0) {
+        stepErrors.maxRounds = 'Number of rounds must be greater than 0';
+      }
+
+      if (Object.keys(stepErrors).length > 0) {
+        setErrors(stepErrors);
+        return;
+      }
+    }
+
+    setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+    setErrors({});
+  };
+
+  const prevStep = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 0));
+    setErrors({});
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -39,41 +90,8 @@ export default function CreateCirclePage() {
     }
   };
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name) {
-      newErrors.name = 'Circle name is required';
-    } else if (formData.name.length < 3) {
-      newErrors.name = 'Circle name must be at least 3 characters';
-    }
-
-    if (!formData.contributionAmount) {
-      newErrors.contributionAmount = 'Contribution amount is required';
-    } else if (parseFloat(formData.contributionAmount) <= 0) {
-      newErrors.contributionAmount = 'Contribution amount must be greater than 0';
-    }
-
-    const frequency = parseInt(formData.contributionFrequencyDays);
-    if (frequency <= 0) {
-      newErrors.contributionFrequencyDays = 'Frequency must be greater than 0';
-    }
-
-    const rounds = parseInt(formData.maxRounds);
-    if (rounds <= 0) {
-      newErrors.maxRounds = 'Number of rounds must be greater than 0';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
 
     setLoading(true);
 
@@ -136,144 +154,196 @@ export default function CreateCirclePage() {
 
       {/* Form */}
       <div className="container mx-auto px-4 py-12 max-w-2xl">
+        <div className="mb-8">
+          <Stepper steps={steps} currentStep={currentStep} />
+        </div>
+
         <Card>
           <CardHeader>
-            <CardTitle>Circle Details</CardTitle>
+            <CardTitle>{steps[currentStep].title}</CardTitle>
             <CardDescription>
-              Set up the basic information for your savings circle. You can adjust settings later.
+              {currentStep === 0 && 'Set up the basic information for your savings circle.'}
+              {currentStep === 1 && 'Define how much and how often members will contribute.'}
+              {currentStep === 2 && 'Review your circle details before creating.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Circle Name */}
-              <div className="space-y-2">
-                <Label htmlFor="name">Circle Name *</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  placeholder="e.g., Office Savings Circle"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className={errors.name ? 'border-destructive' : ''}
-                />
-                {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
-              </div>
+              {currentStep === 0 && (
+                <div className="space-y-6">
+                  {/* Circle Name */}
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Circle Name *</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      placeholder="e.g., Office Savings Circle"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className={errors.name ? 'border-destructive' : ''}
+                    />
+                    {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                  </div>
 
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  name="description"
-                  placeholder="Tell members about your circle..."
-                  value={formData.description}
-                  onChange={handleChange}
-                  rows={4}
-                />
-              </div>
-
-              {/* Grid for Contribution Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Contribution Amount */}
-                <div className="space-y-2">
-                  <Label htmlFor="contributionAmount">
-                    Contribution Amount (XLM) *
-                  </Label>
-                  <Input
-                    id="contributionAmount"
-                    name="contributionAmount"
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g., 100"
-                    value={formData.contributionAmount}
-                    onChange={handleChange}
-                    className={errors.contributionAmount ? 'border-destructive' : ''}
-                  />
-                  {errors.contributionAmount && (
-                    <p className="text-sm text-destructive">{errors.contributionAmount}</p>
-                  )}
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      name="description"
+                      placeholder="Tell members about your circle..."
+                      value={formData.description}
+                      onChange={handleChange}
+                      rows={4}
+                    />
+                  </div>
                 </div>
+              )}
 
-                {/* Frequency */}
-                <div className="space-y-2">
-                  <Label htmlFor="contributionFrequencyDays">
-                    Contribution Frequency (Days) *
-                  </Label>
-                  <Input
-                    id="contributionFrequencyDays"
-                    name="contributionFrequencyDays"
-                    type="number"
-                    placeholder="e.g., 7"
-                    value={formData.contributionFrequencyDays}
-                    onChange={handleChange}
-                    className={errors.contributionFrequencyDays ? 'border-destructive' : ''}
-                  />
-                  {errors.contributionFrequencyDays && (
-                    <p className="text-sm text-destructive">
-                      {errors.contributionFrequencyDays}
+              {currentStep === 1 && (
+                <div className="space-y-6">
+                  {/* Grid for Contribution Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Contribution Amount */}
+                    <div className="space-y-2">
+                      <Label htmlFor="contributionAmount">
+                        Contribution Amount (XLM) *
+                      </Label>
+                      <Input
+                        id="contributionAmount"
+                        name="contributionAmount"
+                        type="number"
+                        step="0.1"
+                        placeholder="e.g., 100"
+                        value={formData.contributionAmount}
+                        onChange={handleChange}
+                        className={errors.contributionAmount ? 'border-destructive' : ''}
+                      />
+                      {errors.contributionAmount && (
+                        <p className="text-sm text-destructive">{errors.contributionAmount}</p>
+                      )}
+                    </div>
+
+                    {/* Frequency */}
+                    <div className="space-y-2">
+                      <Label htmlFor="contributionFrequencyDays">
+                        Contribution Frequency (Days) *
+                      </Label>
+                      <Input
+                        id="contributionFrequencyDays"
+                        name="contributionFrequencyDays"
+                        type="number"
+                        placeholder="e.g., 7"
+                        value={formData.contributionFrequencyDays}
+                        onChange={handleChange}
+                        className={errors.contributionFrequencyDays ? 'border-destructive' : ''}
+                      />
+                      {errors.contributionFrequencyDays && (
+                        <p className="text-sm text-destructive">
+                          {errors.contributionFrequencyDays}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Max Rounds */}
+                  <div className="space-y-2">
+                    <Label htmlFor="maxRounds">Number of Rounds *</Label>
+                    <Input
+                      id="maxRounds"
+                      name="maxRounds"
+                      type="number"
+                      placeholder="e.g., 12"
+                      value={formData.maxRounds}
+                      onChange={handleChange}
+                      className={errors.maxRounds ? 'border-destructive' : ''}
+                    />
+                    {errors.maxRounds && <p className="text-sm text-destructive">{errors.maxRounds}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Each round, one member receives the total pooled amount
                     </p>
-                  )}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Max Rounds */}
-              <div className="space-y-2">
-                <Label htmlFor="maxRounds">Number of Rounds *</Label>
-                <Input
-                  id="maxRounds"
-                  name="maxRounds"
-                  type="number"
-                  placeholder="e.g., 12"
-                  value={formData.maxRounds}
-                  onChange={handleChange}
-                  className={errors.maxRounds ? 'border-destructive' : ''}
-                />
-                {errors.maxRounds && <p className="text-sm text-destructive">{errors.maxRounds}</p>}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Each round, one member receives the total pooled amount
-                </p>
-              </div>
-
-              {/* Summary */}
-              <div className="bg-secondary/10 p-4 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-2">Circle Summary</h4>
-                <div className="space-y-1 text-sm">
-                  <p>
-                    <span className="text-muted-foreground">Per Member Contribution:</span>{' '}
-                    <span className="font-semibold">
-                      {formData.contributionAmount ? `${formData.contributionAmount} XLM` : '-'}
-                    </span>
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Payout Per Round:</span>{' '}
-                    <span className="font-semibold">
-                      {formData.contributionAmount && formData.maxRounds
-                        ? `${(parseFloat(formData.contributionAmount) * parseInt(formData.maxRounds)).toFixed(2)} XLM`
-                        : '-'}
-                    </span>
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Frequency:</span>{' '}
-                    <span className="font-semibold">
-                      Every {formData.contributionFrequencyDays} days
-                    </span>
-                  </p>
+              {currentStep === 2 && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Circle Name</p>
+                      <p className="font-medium">{formData.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Contribution</p>
+                      <p className="font-medium">{formData.contributionAmount} XLM</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Frequency</p>
+                      <p className="font-medium">Every {formData.contributionFrequencyDays} days</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Rounds</p>
+                      <p className="font-medium">{formData.maxRounds} rounds</p>
+                    </div>
+                  </div>
+                  
+                  {/* Summary */}
+                  <div className="bg-secondary/10 p-4 rounded-lg">
+                    <h4 className="font-semibold text-foreground mb-2">Payout Summary</h4>
+                    <div className="space-y-1 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">Payout Per Round:</span>{' '}
+                        <span className="font-semibold text-primary">
+                          {formData.contributionAmount && formData.maxRounds
+                            ? `${(parseFloat(formData.contributionAmount) * parseInt(formData.maxRounds)).toFixed(2)} XLM`
+                            : '-'}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        This is the total amount each member will receive when it's their turn.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Buttons */}
-              <div className="flex gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.back()}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" className="flex-1" disabled={loading}>
-                  {loading ? 'Creating...' : 'Create Circle'}
-                </Button>
+              <div className="flex gap-4 pt-4 border-t border-border">
+                {currentStep === 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => router.back()}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={prevStep}
+                    className="flex-1"
+                  >
+                    <ChevronLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Button>
+                )}
+
+                {currentStep === steps.length - 1 ? (
+                  <Button type="submit" className="flex-1" disabled={loading}>
+                    {loading ? 'Creating...' : 'Create Circle'}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={nextStep}
+                    className="flex-1"
+                  >
+                    Next
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
