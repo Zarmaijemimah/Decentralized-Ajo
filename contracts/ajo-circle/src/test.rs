@@ -1523,3 +1523,74 @@ fn test_initialize_circle_above_max_rounds_fails() {
     assert_eq!(result, Err(AjoError::InvalidInput));
 }
 
+#[test]
+fn test_emergency_dissolve_unanimous_refunds() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token_address, organizer, user_a, user_b) = setup_with_members(&env);
+    let token_client = token::Client::new(&env, &token_address);
+
+    let before_org = token_client.balance(&organizer);
+    let before_a = token_client.balance(&user_a);
+    let before_b = token_client.balance(&user_b);
+
+    client.deposit(&organizer).unwrap();
+    client.deposit(&user_a).unwrap();
+    client.deposit(&user_b).unwrap();
+
+    assert_eq!(client.get_total_pool(), 300);
+
+    // start dissolution vote
+    client.start_dissolution_vote(&organizer, &0_u32).unwrap();
+
+    client.vote_to_dissolve(&organizer).unwrap();
+    client.vote_to_dissolve(&user_a).unwrap();
+    client.vote_to_dissolve(&user_b).unwrap();
+
+    client.dissolve_and_refund(&organizer).unwrap();
+    client.dissolve_and_refund(&user_a).unwrap();
+    client.dissolve_and_refund(&user_b).unwrap();
+
+    let after_org = token_client.balance(&organizer);
+    let after_a = token_client.balance(&user_a);
+    let after_b = token_client.balance(&user_b);
+
+    assert_eq!(after_org, before_org);
+    assert_eq!(after_a, before_a);
+    assert_eq!(after_b, before_b);
+
+    assert_eq!(client.get_total_pool(), 0);
+}
+
+#[test]
+fn test_upgrade_preserves_state() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    // 1. Deploy V1 and create circle
+    let (client, _token_address, organizer, user_a, user_b) = setup_with_members(&env);
+
+    // Deposit to alter state and verify pre-upgrade
+    client.deposit(&organizer).unwrap();
+    client.deposit(&user_a).unwrap();
+    client.deposit(&user_b).unwrap();
+    assert_eq!(client.get_total_pool(), 300);
+
+    let state_before = client.get_circle_state().unwrap();
+    assert_eq!(state_before.member_count, 3);
+
+    // 2. Upgrade to V2 (simulated by updating the wasm hash)
+    // In native test environments without WASM, we simulate the upgrade by passing a dummy hash.
+    // The native Rust environment will execute the upgrade function logic successfully.
+    let dummy_hash = soroban_sdk::BytesN::from_array(&env, &[1; 32]);
+    let result = client.upgrade(&organizer, &dummy_hash);
+    assert_eq!(result, Ok(()));
+
+    // 3. Verify the circle data is still accessible and persistent
+    let state_after = client.get_circle_state().unwrap();
+    assert_eq!(state_after.member_count, 3);
+    assert_eq!(state_after.contribution_amount, 100);
+    assert_eq!(client.get_total_pool(), 300);
+}
+

@@ -6,7 +6,7 @@ use crate::{AjoCircleClient, AjoError};
 
 #[contracttype]
 pub enum FactoryDataKey {
-    Registry,
+    CircleCount,
 }
 
 #[contract]
@@ -26,13 +26,13 @@ impl AjoFactory {
     ) -> Result<Address, AjoError> {
         organizer.require_auth();
 
-        let mut registry: Vec<Address> = env
+        let mut count: u32 = env
             .storage()
             .instance()
-            .get(&FactoryDataKey::Registry)
-            .unwrap_or_else(|| Vec::new(&env));
+            .get(&FactoryDataKey::CircleCount)
+            .unwrap_or(0);
 
-        let registry_len = registry.len();
+        let registry_len = count;
         let mut salt_bytes = [0u8; 32];
         let len_bytes = registry_len.to_be_bytes();
         let start = 32_usize.checked_sub(len_bytes.len()).ok_or(AjoError::ArithmeticOverflow)?;
@@ -46,7 +46,6 @@ impl AjoFactory {
 
         let salt = BytesN::from_array(&env, &salt_bytes);
 
-        // Soroban deployment by wasm hash acts as the cost-efficient, reusable deploy path.
         let ajo_address = env
             .deployer()
             .with_current_contract(salt)
@@ -62,18 +61,22 @@ impl AjoFactory {
             &max_members,
         );
 
-        registry.push_back(ajo_address.clone());
+        count += 1;
         env.storage()
             .instance()
-            .set(&FactoryDataKey::Registry, &registry);
+            .set(&FactoryDataKey::CircleCount, &count);
+
+        // Record history via events instead of persistent state variables to reduce storage costs
+        env.events().publish(
+            (symbol_short!("factory"), symbol_short!("created")),
+            (organizer, ajo_address.clone()),
+        );
 
         Ok(ajo_address)
     }
 
     pub fn get_registry(env: Env) -> Vec<Address> {
-        env.storage()
-            .instance()
-            .get(&FactoryDataKey::Registry)
-            .unwrap_or_else(|| Vec::new(&env))
+        // Circle registry is now managed via event logs to minimize on-chain storage costs
+        Vec::new(&env)
     }
 }

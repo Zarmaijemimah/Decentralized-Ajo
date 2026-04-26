@@ -692,7 +692,7 @@ impl AjoCircle {
         };
 
         env.storage().instance().set(&DataKey::CircleStatus, &CircleStatus::VotingForDissolution);
-        env.storage().instance().set(&DataKey::CycleWithdrawals, &vote);
+        env.storage().temporary().set(&DataKey::CycleWithdrawals, &vote);
 
         env.events().publish(
             (symbol_short!("dissolve"), symbol_short!("start"), env.current_contract_address()),
@@ -722,13 +722,13 @@ impl AjoCircle {
 
         let mut vote: DissolutionVote = env
             .storage()
-            .instance()
+            .temporary()
             .get(&DataKey::CycleWithdrawals)
             .ok_or(AjoError::NoActiveVote)?;
 
         let mut voted_members: Vec<Address> = env
             .storage()
-            .instance()
+            .temporary()
             .get(&DataKey::VotedMembers)
             .unwrap_or_else(|| Vec::new(&env));
 
@@ -739,7 +739,7 @@ impl AjoCircle {
         }
 
         voted_members.push_back(member.clone());
-        env.storage().instance().set(&DataKey::VotedMembers, &voted_members);
+        env.storage().temporary().set(&DataKey::VotedMembers, &voted_members);
 
         vote.votes_for += 1;
 
@@ -757,20 +757,13 @@ impl AjoCircle {
                 env.ledger().timestamp(),
             );
         } else {
-            env.storage().instance().set(&DataKey::CycleWithdrawals, &vote);
+            env.storage().temporary().set(&DataKey::CycleWithdrawals, &vote);
         }
 
         // Also update member status to Exited (2)
-        let mut members: Map<Address, MemberData> = env
-            .storage()
-            .instance()
-            .get(&DataKey::Members)
-            .ok_or(AjoError::NotFound)?;
-
-        if let Some(mut member_data) = members.get(member.clone()) {
+        if let Ok(mut member_data) = Self::load_member(&env, &member) {
             member_data.status = 2; // Exited
-            members.set(member.clone(), member_data);
-            env.storage().instance().set(&DataKey::Members, &members);
+            Self::save_member(&env, &member, &member_data);
         }
 
         env.events().publish(
