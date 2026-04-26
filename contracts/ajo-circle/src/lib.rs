@@ -20,6 +20,9 @@ mod test;
 #[cfg(test)]
 mod timelock_tests;
 
+#[cfg(test)]
+mod interest_tests;
+
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env, Map,
     Symbol, Vec, BytesN,
@@ -1040,13 +1043,82 @@ impl AjoCircle {
     }
 
     fn pow10_checked(exp: u32) -> Result<i128, AjoError> {
+        Self::checked_pow(10, exp)
+    }
+
+    /// Safe integer exponentiation: base^exp with overflow detection.
+    fn checked_pow(base: i128, exp: u32) -> Result<i128, AjoError> {
         let mut result: i128 = 1;
-        let mut i: u32 = 0;
-        while i < exp {
-            result = result.checked_mul(10).ok_or(AjoError::ArithmeticOverflow)?;
-            i += 1;
+        let mut b = base;
+        let mut e = exp;
+        // binary exponentiation — O(log exp), avoids repeated multiplication drift
+        while e > 0 {
+            if e & 1 == 1 {
+                result = result.checked_mul(b).ok_or(AjoError::ArithmeticOverflow)?;
+            }
+            e >>= 1;
+            if e > 0 {
+                b = b.checked_mul(b).ok_or(AjoError::ArithmeticOverflow)?;
+            }
         }
         Ok(result)
+    }
+
+    /// Compound interest: A = P * (1 + r/12)^months  (monthly compounding).
+    ///
+    /// `annual_rate_bps` — annual rate in basis points (e.g. 500 = 5.00 %).
+    /// `months`          — number of months (up to 24 supported without overflow).
+    ///
+    /// Uses a fixed-point scale of SCALE = 10^12 to preserve precision.
+    /// Returns the *accrued interest* (A - P), not the total amount.
+    pub fn calculate_yield(principal: i128, annual_rate_bps: u32, months: u32) -> Result<i128, AjoError> {
+        if principal <= 0 || months == 0 {
+            return Err(AjoError::InvalidInput);
+        }
+        if annual_rate_bps > 100_000 {
+            // cap at 1000 % annual to prevent overflow
+            return Err(AjoError::InvalidInput);
+        }
+
+        // SCALE = 1_000_000_000_000 (10^12)
+        const SCALE: i128 = 1_000_000_000_000;
+
+        // monthly_factor = SCALE + (annual_rate_bps * SCALE) / (12 * 10_000)
+        //                = SCALE * (1 + r/12)  in fixed-point
+        let numerator = (annual_rate_bps as i128)
+            .checked_mul(SCALE)
+            .ok_or(AjoError::ArithmeticOverflow)?;
+        let monthly_add = numerator / (12 * 10_000);
+        let monthly_factor = SCALE
+            .checked_add(monthly_add)
+            .ok_or(AjoError::ArithmeticOverflow)?;
+
+        // Compute monthly_factor^months using binary exponentiation in SCALE space.
+        // After each squaring we divide by SCALE to keep the value in range.
+        let mut result: i128 = SCALE; // represents 1.0
+        let mut b = monthly_factor;
+        let mut e = months;
+        while e > 0 {
+            if e & 1 == 1 {
+                result = result
+                    .checked_mul(b)
+                    .ok_or(AjoError::ArithmeticOverflow)?
+                    / SCALE;
+            }
+            e >>= 1;
+            if e > 0 {
+                b = b.checked_mul(b).ok_or(AjoError::ArithmeticOverflow)? / SCALE;
+            }
+        }
+        // result is now (1 + r/12)^months in SCALE units
+        // total = principal * result / SCALE
+        let total = principal
+            .checked_mul(result)
+            .ok_or(AjoError::ArithmeticOverflow)?
+            / SCALE;
+
+        let interest = total.checked_sub(principal).ok_or(AjoError::ArithmeticOverflow)?;
+        Ok(interest)
     }
 
     pub fn get_total_pool(env: Env) -> i128 {
