@@ -1,26 +1,46 @@
 'use client';
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { cn } from '@/lib/utils';
+import { MultiSelect } from '@/components/ui/multi-select';
 
 export default function AjoGroupsFilters({ className }: { className?: string }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
+  const statusOptions = [
+    { label: 'Active', value: 'active' },
+    { label: 'Completed', value: 'completed' },
+    { label: 'Upcoming', value: 'upcoming' },
+  ];
+
+  const selectedStatuses = useMemo(() => {
+    const status = searchParams.get('status');
+    return status ? status.split(',') : [];
+  }, [searchParams]);
+
   /**
    * Updates the URL query parameters dynamically.
    * @param name - The parameter key (e.g., 'sort', 'status')
-   * @param value - The parameter value
+   * @param value - The parameter value (can be a string or array of strings)
    */
-  const handleFilterChange = useCallback((name: string, value: string) => {
+  const handleFilterChange = useCallback((name: string, value: string | string[]) => {
     const params = new URLSearchParams(searchParams.toString());
     
-    if (value && value !== 'all') {
-      params.set(name, value);
+    if (Array.isArray(value)) {
+      if (value.length > 0) {
+        params.set(name, value.join(','));
+      } else {
+        params.delete(name);
+      }
     } else {
-      params.delete(name);
+      if (value && value !== 'all') {
+        params.set(name, value);
+      } else {
+        params.delete(name);
+      }
     }
 
     // Reset pagination to page 1 when filters change
@@ -31,17 +51,15 @@ export default function AjoGroupsFilters({ className }: { className?: string }) 
 
   return (
     <div className={cn("flex flex-wrap items-center gap-4", className)}>
-      <select
-        aria-label="Filter by status"
-        onChange={(e) => handleFilterChange('status', e.target.value)}
-        defaultValue={searchParams.get('status') || 'all'}
-        className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        <option value="all">All Status</option>
-        <option value="active">Active</option>
-        <option value="completed">Completed</option>
-        <option value="upcoming">Upcoming</option>
-      </select>
+      <div className="w-[250px]">
+        <MultiSelect
+          options={statusOptions}
+          selected={selectedStatuses}
+          onChange={(values) => handleFilterChange('status', values)}
+          placeholder="Filter by status"
+          className="h-9"
+        />
+      </div>
 
       <select
         aria-label="Sort groups"
