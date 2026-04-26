@@ -216,11 +216,32 @@ export function Navbar() {
         >
           <div id="mobile-menu" className="bg-background px-4 pb-6">
             {/* Navigation Links */}
-            <ul className="flex flex-col gap-1 pt-4" role="list">
+            <ul
+              className="flex flex-col gap-1 pt-4"
+              role="menu"
+              aria-label="Mobile navigation"
+              onKeyDown={(e) => {
+                const items = Array.from(
+                  e.currentTarget.querySelectorAll<HTMLAnchorElement>('a[role="menuitem"]')
+                );
+                const idx = items.indexOf(document.activeElement as HTMLAnchorElement);
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  items[(idx + 1) % items.length]?.focus();
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  items[(idx - 1 + items.length) % items.length]?.focus();
+                } else if (e.key === "Escape") {
+                  setIsOpen(false);
+                }
+              }}
+            >
               {navLinks.map(({ href, label, icon: Icon }) => (
-                <li key={href}>
+                <li key={href} role="none">
                   <Link
                     href={href}
+                    role="menuitem"
+                    tabIndex={isOpen ? 0 : -1}
                     onClick={() => setIsOpen(false)}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 hover:bg-accent hover:text-accent-foreground active:scale-95",

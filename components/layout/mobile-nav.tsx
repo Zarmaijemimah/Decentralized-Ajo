@@ -121,6 +121,30 @@ export function MobileDrawerNav() {
     setIsOpen(false);
   }, [pathname]);
 
+  // Keyboard navigation for drawer
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+        return;
+      }
+      const drawer = document.getElementById("mobile-drawer-nav");
+      if (!drawer) return;
+      const items = Array.from(drawer.querySelectorAll<HTMLElement>('a[role="menuitem"]'));
+      const idx = items.indexOf(document.activeElement as HTMLElement);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        items[(idx + 1) % items.length]?.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        items[(idx - 1 + items.length) % items.length]?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
   return (
     <>
       {/* Drawer Toggle Button */}
@@ -166,11 +190,12 @@ export function MobileDrawerNav() {
 
           {/* Navigation */}
           <div className="flex-1 overflow-y-auto p-4">
-            <nav className="space-y-2">
+            <nav id="mobile-drawer-nav" className="space-y-2" role="menu" aria-label="Mobile drawer navigation">
               {mobileNavItems.map(({ href, label, icon: Icon, badge }) => (
                 <Link
                   key={href}
                   href={href}
+                  role="menuitem"
                   onClick={() => setIsOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors relative",
